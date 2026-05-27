@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -111,11 +111,11 @@
 
     .playback-controls {
       display: grid;
-      grid-template-columns: repeat(6, minmax(86px, auto));
+      grid-template-columns: repeat(7, minmax(78px, auto));
       gap: 8px;
       align-items: end;
       margin-top: 14px;
-      max-width: 760px;
+      max-width: 880px;
     }
 
     .control-field {
@@ -131,6 +131,8 @@
     }
 
     select,
+    input[type="number"],
+    input[type="text"],
     button {
       min-width: 0;
       height: 34px;
@@ -140,6 +142,12 @@
       color: var(--text);
       font: inherit;
       font-size: 13px;
+    }
+
+    input[type="number"],
+    input[type="text"] {
+      width: 100%;
+      padding: 0 10px;
     }
 
     button {
@@ -160,6 +168,126 @@
     }
 
     button.primary:hover { background: #bd7a35; }
+
+    .config-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: grid;
+      place-items: center;
+      padding: 22px;
+      background: rgba(2, 8, 17, 0.72);
+      backdrop-filter: blur(8px);
+    }
+
+    .config-modal.hidden { display: none; }
+
+    .config-panel {
+      width: min(880px, 100%);
+      border: 1px solid rgba(96, 165, 250, 0.24);
+      border-radius: 10px;
+      background: linear-gradient(180deg, rgba(16, 31, 52, 0.98), rgba(8, 18, 32, 0.99));
+      box-shadow: 0 28px 80px rgba(0, 0, 0, 0.45);
+      overflow: hidden;
+    }
+
+    .config-head,
+    .config-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 18px 20px;
+      border-bottom: 1px solid rgba(201, 220, 255, 0.12);
+    }
+
+    .config-head h2 {
+      margin: 0;
+      font-size: 18px;
+    }
+
+    .config-head p {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .config-close {
+      min-width: 34px;
+      width: 34px;
+      padding: 0;
+      font-size: 20px;
+    }
+
+    .config-body {
+      display: grid;
+      gap: 18px;
+      padding: 20px;
+    }
+
+    .config-section {
+      display: grid;
+      gap: 12px;
+    }
+
+    .config-section h3 {
+      margin: 0;
+      color: #cfe6ff;
+      font-size: 13px;
+      text-transform: uppercase;
+    }
+
+    .config-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .config-zone-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .config-field,
+    .config-zone {
+      display: grid;
+      gap: 6px;
+      padding: 12px;
+      border: 1px solid rgba(201, 220, 255, 0.12);
+      border-radius: 8px;
+      background: rgba(4, 14, 27, 0.48);
+    }
+
+    .config-field span,
+    .config-zone span {
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+    }
+
+    .grid-pair {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .config-preview {
+      min-height: 88px;
+      padding: 12px;
+      border: 1px solid rgba(96, 165, 250, 0.16);
+      border-radius: 8px;
+      color: #b8d9ff;
+      background: rgba(2, 9, 19, 0.56);
+      font: 12px/1.45 Consolas, "Courier New", monospace;
+      white-space: pre-wrap;
+    }
+
+    .config-actions {
+      justify-content: flex-end;
+      border-top: 1px solid rgba(201, 220, 255, 0.12);
+      border-bottom: 0;
+    }
 
     .metrics {
       display: grid;
@@ -990,18 +1118,14 @@
 
     .viewer3d-module-labels {
       position: absolute;
-      left: 42px;
-      right: 42px;
-      top: 42%;
+      inset: 0;
       z-index: 3;
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 34px;
       pointer-events: none;
     }
 
     .viewer3d-module-labels span {
-      justify-self: start;
+      position: absolute;
+      transform: translate(-50%, -50%);
       padding: 7px 12px;
       border: 1px solid rgba(96, 165, 250, 0.45);
       border-radius: 7px;
@@ -1063,6 +1187,7 @@
             <button id="pauseBtn">Pause</button>
             <button id="resetBtn">Reset</button>
             <button id="loadJsonBtn">Load JSON File</button>
+            <button id="exportConfigBtn">Simulation Setup</button>
             <input id="jsonInput" type="file" accept="application/json,.json" />
           </div>
         </div>
@@ -1188,6 +1313,46 @@
         </div>
       </article>
     </section>
+
+    <div class="config-modal hidden" id="configModal" aria-hidden="true">
+      <section class="config-panel" aria-label="Simulation configuration panel">
+        <div class="config-head">
+          <div>
+            <h2>Simulation Setup</h2>
+            <p>Generate sim_config.json for PyDEVS from one configuration panel.</p>
+          </div>
+          <button class="config-close" id="configCloseBtn" aria-label="Close simulation setup">&times;</button>
+        </div>
+        <div class="config-body">
+          <div class="config-section">
+            <h3>Scenario Parameters</h3>
+            <div class="config-grid">
+              <label class="config-field"><span>Blocks</span><input id="cfgBlocks" type="number" min="1" step="1"></label>
+              <label class="config-field"><span>Transporters</span><input id="cfgTransporters" type="number" min="1" step="1"></label>
+              <label class="config-field"><span>Due Days</span><input id="cfgDueDays" type="number" min="0.5" step="0.5"></label>
+              <label class="config-field"><span>Termination Time</span><input id="cfgTermination" type="number" min="1" step="1"></label>
+            </div>
+          </div>
+          <div class="config-section">
+            <h3>Process Grid Area</h3>
+            <div class="config-zone-grid">
+              <label class="config-zone"><span>Soji</span><div class="grid-pair"><input id="cfgSojiCols" type="number" min="1" step="1" aria-label="Soji columns"><input id="cfgSojiRows" type="number" min="1" step="1" aria-label="Soji rows"></div></label>
+              <label class="config-zone"><span>Painting</span><div class="grid-pair"><input id="cfgPaintingCols" type="number" min="1" step="1" aria-label="Painting columns"><input id="cfgPaintingRows" type="number" min="1" step="1" aria-label="Painting rows"></div></label>
+              <label class="config-zone"><span>Storage</span><div class="grid-pair"><input id="cfgStorageCols" type="number" min="1" step="1" aria-label="Storage columns"><input id="cfgStorageRows" type="number" min="1" step="1" aria-label="Storage rows"></div></label>
+              <label class="config-zone"><span>PE</span><div class="grid-pair"><input id="cfgPECols" type="number" min="1" step="1" aria-label="PE columns"><input id="cfgPERows" type="number" min="1" step="1" aria-label="PE rows"></div></label>
+            </div>
+          </div>
+          <div class="config-section">
+            <h3>Config Preview</h3>
+            <pre class="config-preview" id="configPreview"></pre>
+          </div>
+        </div>
+        <div class="config-actions">
+          <button id="configResetBtn">Load Current Values</button>
+          <button class="primary" id="configDownloadBtn">Download sim_config.json</button>
+        </div>
+      </section>
+    </div>
   </div>
 
   <script>
@@ -1221,7 +1386,20 @@
     const viewer3dScene = document.getElementById("viewer3dScene");
     const viewer3dWorld = document.getElementById("viewer3dWorld");
     const webglPlacementHud = document.getElementById("webglPlacementHud");
+    const viewer3dModuleLabels = document.querySelector(".viewer3d-module-labels");
     const candidateToggle = document.getElementById("candidateToggle");
+    const configModal = document.getElementById("configModal");
+    const configPreview = document.getElementById("configPreview");
+    const configFieldIds = {
+      blocks: "cfgBlocks",
+      transporters: "cfgTransporters",
+      due_days: "cfgDueDays",
+      termination_time: "cfgTermination",
+      Soji: ["cfgSojiCols", "cfgSojiRows"],
+      Painting: ["cfgPaintingCols", "cfgPaintingRows"],
+      Storage: ["cfgStorageCols", "cfgStorageRows"],
+      PE: ["cfgPECols", "cfgPERows"]
+    };
 
     let activeLog = null;
     let loadedLog = null;
@@ -1879,6 +2057,7 @@
       const view = mat4LookAt([0, 10.8, 18.4], [0, 0, 0.55], [0, 1, 0]);
       const viewProjection = mat4Multiply(projection, view);
       const boardWorld = getWebGLBoardLayout();
+      updateWebGLModuleLabels(boardWorld, viewProjection, width, height);
 
       usePlacementProgram(gl, resources);
       drawWebGLFloor(gl, resources, viewProjection);
@@ -1991,6 +2170,23 @@
         };
       });
       return layout;
+    }
+
+    function updateWebGLModuleLabels(boards, viewProjection, width, height) {
+      if (!viewer3dModuleLabels) return;
+      MODULE_ORDER.forEach((moduleName) => {
+        const label = Array.from(viewer3dModuleLabels.children).find((node) => node.textContent.trim() === moduleName);
+        const board = boards[moduleName];
+        if (!label || !board) return;
+        const screen = projectWebGLPoint(viewProjection, [board.x, 0.62, board.z - board.d * 0.08], width, height);
+        if (!screen || screen.z < -1 || screen.z > 1) {
+          label.style.opacity = "0";
+          return;
+        }
+        label.style.opacity = "1";
+        label.style.left = `${screen.x}px`;
+        label.style.top = `${screen.y}px`;
+      });
     }
 
     function drawWebGLFloor(gl, resources, viewProjection) {
@@ -2224,6 +2420,22 @@
         }
       }
       return out;
+    }
+
+    function projectWebGLPoint(matrix, point, width, height) {
+      const [x, y, z] = point;
+      const clipX = matrix[0] * x + matrix[4] * y + matrix[8] * z + matrix[12];
+      const clipY = matrix[1] * x + matrix[5] * y + matrix[9] * z + matrix[13];
+      const clipZ = matrix[2] * x + matrix[6] * y + matrix[10] * z + matrix[14];
+      const clipW = matrix[3] * x + matrix[7] * y + matrix[11] * z + matrix[15];
+      if (!clipW) return null;
+      const ndcX = clipX / clipW;
+      const ndcY = clipY / clipW;
+      return {
+        x: (ndcX * 0.5 + 0.5) * width,
+        y: (-ndcY * 0.5 + 0.5) * height,
+        z: clipZ / clipW
+      };
     }
 
     function normalize3(v) {
@@ -3191,6 +3403,104 @@
       document.getElementById("simTime").textContent = `${simTime.toFixed(1)} ${unit}`;
     }
 
+    function exportSimulationConfig() {
+      openConfigPanel();
+    }
+
+    function openConfigPanel() {
+      populateConfigPanel(getSimulationConfigDefaults());
+      configModal.classList.remove("hidden");
+      configModal.setAttribute("aria-hidden", "false");
+      updateConfigPreview();
+    }
+
+    function closeConfigPanel() {
+      configModal.classList.add("hidden");
+      configModal.setAttribute("aria-hidden", "true");
+    }
+
+    function populateConfigPanel(defaults) {
+      setConfigValue(configFieldIds.blocks, defaults.blocks);
+      setConfigValue(configFieldIds.transporters, defaults.transporters);
+      setConfigValue(configFieldIds.due_days, defaults.due_days);
+      setConfigValue(configFieldIds.termination_time, defaults.termination_time);
+      MODULE_ORDER.forEach((name) => {
+        const [cols, rows] = parseGridText(defaults.grids[name]);
+        setConfigValue(configFieldIds[name][0], cols);
+        setConfigValue(configFieldIds[name][1], rows);
+      });
+    }
+
+    function readConfigPanel() {
+      const grids = {};
+      MODULE_ORDER.forEach((name) => {
+        const cols = readPositiveNumber(configFieldIds[name][0], MODULE_META[name].cols);
+        const rows = readPositiveNumber(configFieldIds[name][1], MODULE_META[name].rows);
+        grids[name] = `${Math.round(cols)}x${Math.round(rows)}`;
+      });
+      return {
+        blocks: Math.round(readPositiveNumber(configFieldIds.blocks, 36)),
+        transporters: Math.round(readPositiveNumber(configFieldIds.transporters, 4)),
+        due_days: readPositiveNumber(configFieldIds.due_days, 4),
+        termination_time: readPositiveNumber(configFieldIds.termination_time, 260),
+        grids,
+        out: "devs_event_log.json"
+      };
+    }
+
+    function updateConfigPreview() {
+      if (!configPreview) return;
+      configPreview.textContent = JSON.stringify(readConfigPanel(), null, 2);
+    }
+
+    function downloadConfigFromPanel() {
+      downloadJson("sim_config.json", readConfigPanel());
+      closeConfigPanel();
+    }
+
+    function setConfigValue(id, value) {
+      const input = document.getElementById(id);
+      if (input) input.value = value;
+    }
+
+    function readPositiveNumber(id, fallback) {
+      const input = document.getElementById(id);
+      const number = Number(input?.value);
+      return Number.isFinite(number) && number > 0 ? number : fallback;
+    }
+
+    function parseGridText(value) {
+      const match = String(value || "").toLowerCase().match(/^(\d+)x(\d+)$/);
+      return match ? [Number(match[1]), Number(match[2])] : [12, 8];
+    }
+
+    function getSimulationConfigDefaults() {
+      const modules = Object.fromEntries((activeLog?.modules || []).map((module) => [
+        normalizeModule(module.module_name || module.module_id),
+        `${module.grid_cols || 12}x${module.grid_rows || 8}`
+      ]));
+      const lastEventTime = events.length ? Math.ceil(events[events.length - 1].time + 20) : 260;
+      return {
+        blocks: Number(activeLog?.meta?.block_count || knownBlockIds.size || 36),
+        transporters: Number(activeLog?.meta?.transporter_count || Object.keys(transporters).length || 4),
+        due_days: Number(activeLog?.meta?.due_days || 4),
+        termination_time: Number(activeLog?.meta?.termination_time || lastEventTime),
+        grids: Object.fromEntries(MODULE_ORDER.map((name) => [name, modules[name] || `${MODULE_META[name].cols}x${MODULE_META[name].rows}`]))
+      };
+    }
+
+    function downloadJson(filename, data) {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
+
     function lerp(a, b, t) { return a + (b - a) * t; }
     function ease(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
 
@@ -3198,6 +3508,19 @@
     document.getElementById("pauseBtn").addEventListener("click", pausePlayback);
     document.getElementById("resetBtn").addEventListener("click", () => resetSimulation());
     document.getElementById("loadJsonBtn").addEventListener("click", () => jsonInput.click());
+    document.getElementById("exportConfigBtn").addEventListener("click", exportSimulationConfig);
+    document.getElementById("configCloseBtn").addEventListener("click", closeConfigPanel);
+    document.getElementById("configResetBtn").addEventListener("click", () => {
+      populateConfigPanel(getSimulationConfigDefaults());
+      updateConfigPreview();
+    });
+    document.getElementById("configDownloadBtn").addEventListener("click", downloadConfigFromPanel);
+    configModal.addEventListener("click", (event) => {
+      if (event.target === configModal) closeConfigPanel();
+    });
+    document.querySelectorAll(".config-panel input").forEach((input) => {
+      input.addEventListener("input", updateConfigPreview);
+    });
     speedSelect.addEventListener("change", () => { playbackSpeed = Number(speedSelect.value) || 1; });
     candidateToggle.addEventListener("change", () => {
       showCandidateOverlay = candidateToggle.checked;

@@ -1,0 +1,3234 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Shipyard Block Process Simulation Playback</title>
+  <style>
+    :root {
+      --bg: #071120;
+      --panel: #101b2c;
+      --panel-2: #142238;
+      --line: rgba(201, 220, 255, 0.15);
+      --text: #edf5ff;
+      --muted: #91a6c3;
+      --accent: #f0b45b;
+      --ready: #f6d36b;
+      --final: #74d99f;
+      --soji: #8a5732;
+      --painting: #2f8057;
+      --storage: #2c68aa;
+      --pe: #7551b5;
+      --rust: #a7663d;
+      --steel: #8795a5;
+      --primer: #aa5750;
+      --gray: #7f8995;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
+      background:
+        linear-gradient(180deg, rgba(17, 31, 51, 0.96), rgba(7, 17, 32, 1)),
+        radial-gradient(circle at 18% 12%, rgba(51, 113, 179, 0.22), transparent 34%),
+        var(--bg);
+      overflow-x: hidden;
+    }
+
+    .app {
+      width: min(1720px, 100%);
+      margin: 0 auto;
+      padding: 16px;
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: minmax(430px, 1.35fr) minmax(650px, 1.65fr);
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .title-panel,
+    .metric-card,
+    .stage,
+    .dashboard-card {
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(20, 33, 53, 0.96), rgba(10, 21, 36, 0.97));
+      box-shadow: 0 18px 44px rgba(0, 0, 0, 0.28);
+    }
+
+    .title-panel {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      min-height: 142px;
+      padding: 18px;
+      border-radius: 8px;
+    }
+
+    h1 {
+      margin: 0 0 9px;
+      font-size: clamp(22px, 1.8vw, 32px);
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    .subline {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 11px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .clock {
+      flex: 0 0 150px;
+      align-self: flex-start;
+      padding: 10px 12px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 6px;
+      background: rgba(5, 12, 23, 0.62);
+      text-align: right;
+    }
+
+    .clock span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+    }
+
+    .clock strong {
+      display: block;
+      margin-top: 4px;
+      font-size: 24px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .playback-controls {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(86px, auto));
+      gap: 8px;
+      align-items: end;
+      margin-top: 14px;
+      max-width: 760px;
+    }
+
+    .control-field {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .control-field span {
+      color: var(--muted);
+      font-size: 10px;
+      text-transform: uppercase;
+    }
+
+    select,
+    button {
+      min-width: 0;
+      height: 34px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 6px;
+      background: #1c2d47;
+      color: var(--text);
+      font: inherit;
+      font-size: 13px;
+    }
+
+    button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 74px;
+      padding: 0 12px;
+      cursor: pointer;
+    }
+
+    button:hover,
+    select:hover { background: #263b5b; }
+
+    button.primary {
+      border-color: rgba(240, 180, 91, 0.62);
+      background: #ae6f2e;
+    }
+
+    button.primary:hover { background: #bd7a35; }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .metric-card {
+      min-height: 142px;
+      padding: 14px 12px;
+      border-radius: 8px;
+    }
+
+    .metric-card .label {
+      min-height: 28px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.25;
+      text-transform: uppercase;
+    }
+
+    .metric-card .value {
+      margin-top: 8px;
+      font-size: 28px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .metric-card .hint {
+      margin-top: 6px;
+      color: #b6c7dd;
+      font-size: 11px;
+      line-height: 1.25;
+    }
+
+    .simulation-shell {
+      position: relative;
+      display: none;
+      min-height: 505px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background:
+        linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+        rgba(5, 12, 23, 0.65);
+      background-size: 32px 32px;
+      overflow: hidden;
+    }
+
+    .route-svg {
+      position: absolute;
+      inset: 12px;
+      width: calc(100% - 24px);
+      height: calc(100% - 24px);
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .route-line {
+      stroke: rgba(240, 180, 91, 0.78);
+      stroke-width: 4;
+      stroke-dasharray: 10 10;
+      fill: none;
+      filter: drop-shadow(0 0 8px rgba(240, 180, 91, 0.3));
+    }
+
+    .route-line.active {
+      stroke: #ffd27a;
+      stroke-width: 5;
+      stroke-dasharray: 7 7;
+    }
+
+    .process-strip {
+      position: relative;
+      z-index: 3;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 40px;
+      min-height: 480px;
+    }
+
+    .stage {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .stage::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      opacity: 0.18;
+      pointer-events: none;
+    }
+
+    .stage.soji::before { background: linear-gradient(135deg, var(--soji), transparent 62%); }
+    .stage.painting::before { background: linear-gradient(135deg, var(--painting), transparent 62%); }
+    .stage.storage::before { background: linear-gradient(135deg, var(--storage), transparent 62%); }
+    .stage.pe::before { background: linear-gradient(135deg, var(--pe), transparent 62%); }
+
+    .stage-header {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 13px 13px 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+    }
+
+    .stage-name { font-size: 15px; font-weight: 700; }
+
+    .stage-desc {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.25;
+    }
+
+    .stage-capa {
+      min-width: 76px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      background: rgba(5, 11, 20, 0.55);
+      color: #d9e8ff;
+      font-size: 11px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .workbench {
+      position: relative;
+      z-index: 1;
+      flex: 1;
+      margin: 11px 12px;
+      min-height: 344px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 6px;
+      background:
+        linear-gradient(90deg, rgba(216, 233, 255, 0.12) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(216, 233, 255, 0.12) 1px, transparent 1px),
+        rgba(4, 11, 20, 0.48);
+      background-size: calc(100% / var(--cols)) calc(100% / var(--rows));
+      overflow: hidden;
+    }
+
+    .blocks-layer,
+    .transporters-layer {
+      position: absolute;
+      inset: 0;
+    }
+
+    .block {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-width: 24px;
+      min-height: 22px;
+      padding: 5px;
+      border: 1px solid rgba(255, 255, 255, 0.38);
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.02)),
+        var(--block-color);
+      color: #f8fbff;
+      font-size: 10px;
+      font-weight: 700;
+      overflow: hidden;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+      transition: left 220ms ease, top 220ms ease, opacity 160ms ease;
+    }
+
+    .shape-a { clip-path: polygon(0 0, 88% 0, 100% 27%, 100% 100%, 0 100%); }
+    .shape-b { clip-path: polygon(8% 0, 100% 0, 100% 72%, 84% 100%, 0 100%, 0 18%); }
+    .shape-c { clip-path: polygon(0 16%, 16% 0, 100% 0, 100% 100%, 12% 100%, 0 82%); }
+    .shape-d { clip-path: polygon(0 0, 100% 0, 100% 82%, 74% 100%, 0 100%); }
+    .shape-l { clip-path: polygon(0 0, 100% 0, 100% 42%, 58% 42%, 58% 100%, 0 100%); }
+
+    .block .id,
+    .block .meta,
+    .block .badge {
+      position: relative;
+      z-index: 2;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.62);
+    }
+
+    .block .badge {
+      align-self: flex-start;
+      margin-top: 4px;
+      padding: 2px 5px;
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.28);
+      color: #eaf3ff;
+      font-size: 8px;
+    }
+
+    .block .meta {
+      align-self: flex-end;
+      color: rgba(255, 255, 255, 0.78);
+      font-size: 9px;
+    }
+
+    .block.ready {
+      border-color: rgba(246, 211, 107, 0.94);
+      box-shadow: inset 0 0 0 1px rgba(246, 211, 107, 0.22), 0 0 0 1px rgba(246, 211, 107, 0.42);
+    }
+
+    .block.ready .badge { background: rgba(246, 211, 107, 0.24); color: #ffe59a; }
+    .block.stored { border-color: rgba(130, 190, 255, 0.58); }
+    .block.stored .badge { background: rgba(74, 149, 216, 0.24); color: #c7e2ff; }
+
+    .block.delayed {
+      outline: 2px solid rgba(255, 119, 119, 0.72);
+      outline-offset: -3px;
+    }
+
+    .block.final {
+      border-color: rgba(116, 217, 159, 0.96);
+      box-shadow: inset 0 0 0 1px rgba(116, 217, 159, 0.24), 0 0 0 1px rgba(116, 217, 159, 0.42);
+    }
+
+    .block.final .badge { background: rgba(116, 217, 159, 0.25); color: #b6f4ce; }
+
+    .placement-overlay {
+      position: absolute;
+      z-index: 1;
+      pointer-events: none;
+      border-radius: 4px;
+    }
+
+    .placement-selected {
+      border: 2px solid rgba(246, 211, 107, 0.96);
+      background: rgba(246, 211, 107, 0.10);
+      box-shadow: 0 0 18px rgba(246, 211, 107, 0.22);
+    }
+
+    .placement-free-rect {
+      border: 2px dashed rgba(86, 166, 255, 0.72);
+      background: rgba(74, 149, 216, 0.07);
+    }
+
+    .placement-planned {
+      border: 2px dashed rgba(255, 255, 255, 0.48);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .stage-footer {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 0 13px 12px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .transporters-layer {
+      z-index: 8;
+      pointer-events: none;
+    }
+
+    .transporter {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 58px;
+      height: 34px;
+      transform: translate(-180px, -180px);
+    }
+
+    .vehicle {
+      position: absolute;
+      left: 0;
+      top: 11px;
+      width: 58px;
+      height: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.58);
+      border-radius: 4px;
+      background: linear-gradient(180deg, #eeb45a, #aa6c2c);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45), 0 0 12px rgba(240, 180, 91, 0.24);
+    }
+
+    .vehicle::before {
+      content: "";
+      position: absolute;
+      left: 7px;
+      top: -7px;
+      width: 18px;
+      height: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.46);
+      border-bottom: 0;
+      border-radius: 3px 3px 0 0;
+      background: #253956;
+    }
+
+    .vehicle::after {
+      content: "";
+      position: absolute;
+      left: 7px;
+      right: 7px;
+      bottom: -6px;
+      height: 6px;
+      background:
+        radial-gradient(circle at 4px 50%, #111 0 4px, transparent 5px),
+        radial-gradient(circle at calc(100% - 4px) 50%, #111 0 4px, transparent 5px);
+    }
+
+    .transporter .cargo {
+      position: absolute;
+      left: 20px;
+      top: 0;
+      width: 25px;
+      height: 13px;
+      border: 1px solid rgba(255, 255, 255, 0.52);
+      background: var(--cargo-color, #8795a5);
+      clip-path: polygon(0 0, 82% 0, 100% 28%, 100% 100%, 0 100%);
+      opacity: 0;
+    }
+
+    .transporter.loaded .cargo { opacity: 1; }
+
+    .transporter .tag {
+      position: absolute;
+      left: 0;
+      top: -13px;
+      min-width: 35px;
+      padding: 1px 5px;
+      border-radius: 999px;
+      background: rgba(5, 12, 22, 0.78);
+      color: #d9e8ff;
+      font-size: 9px;
+      text-align: center;
+    }
+
+    .transporter.idle { filter: saturate(0.78) brightness(0.82); }
+
+    .dashboard {
+      display: grid;
+      grid-template-columns: 1.05fr 0.82fr 0.95fr 0.86fr 1.15fr 1.05fr 1fr;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .dashboard-card {
+      min-height: 178px;
+      padding: 13px;
+      border-radius: 8px;
+    }
+
+    .dashboard-card h2 {
+      margin: 0 0 12px;
+      color: #dceaff;
+      font-size: 13px;
+      text-transform: uppercase;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .flow-node {
+      min-height: 76px;
+      padding: 9px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 6px;
+      background: rgba(5, 12, 22, 0.46);
+      font-size: 11px;
+    }
+
+    .flow-node strong { display: block; margin-bottom: 4px; }
+    .flow-node span { color: var(--muted); font-size: 10px; line-height: 1.25; }
+    .flow-arrow { color: var(--accent); font-weight: 700; }
+
+    .status-row,
+    .analyzer-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 7px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+      font-size: 12px;
+    }
+
+    .status-row:last-child,
+    .analyzer-row:last-child { border-bottom: 0; }
+
+    .analyzer-row.capa-row,
+    .analyzer-head {
+      display: grid;
+      grid-template-columns: 70px 58px 58px 92px;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .analyzer-head {
+      padding-bottom: 4px;
+      color: var(--muted);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .pill {
+      min-width: 58px;
+      padding: 4px 7px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.09);
+      color: #dceaff;
+      font-size: 11px;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .pill.ok { background: rgba(116, 217, 159, 0.18); color: #a9efc3; }
+    .pill.warn { background: rgba(246, 211, 107, 0.18); color: #ffe59a; }
+    .pill.blue { background: rgba(133, 183, 255, 0.18); color: #cfe3ff; }
+    .pill.danger { background: rgba(255, 119, 119, 0.19); color: #ffb2b2; }
+    .pill.neutral { background: rgba(255, 255, 255, 0.1); color: #dceaff; }
+
+    .analyzer-note {
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.35;
+    }
+
+    .util-list,
+    .summary-list,
+    .analyzer-list { display: grid; gap: 9px; }
+
+    .util-row {
+      display: grid;
+      grid-template-columns: 72px 1fr 42px;
+      align-items: center;
+      gap: 8px;
+      color: #dce8f8;
+      font-size: 12px;
+    }
+
+    .bar {
+      height: 8px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .bar span {
+      display: block;
+      width: var(--value);
+      height: 100%;
+      border-radius: inherit;
+      background: var(--bar-color);
+    }
+
+    .summary-row {
+      display: grid;
+      grid-template-columns: 14px 1fr auto;
+      align-items: center;
+      gap: 8px;
+      color: #dce8f8;
+      font-size: 12px;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--dot);
+      box-shadow: 0 0 12px rgba(255, 255, 255, 0.14);
+    }
+
+    .legend {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 10px;
+    }
+
+    .legend-item {
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      align-items: center;
+      gap: 7px;
+      color: #d9e5f7;
+      font-size: 11px;
+      min-width: 0;
+    }
+
+    .legend-swatch {
+      width: 28px;
+      height: 17px;
+      border: 1px solid rgba(255, 255, 255, 0.32);
+      background: var(--swatch);
+      clip-path: polygon(0 0, 82% 0, 100% 28%, 100% 100%, 0 100%);
+    }
+
+    .legend-swatch.ready { border-color: var(--ready); }
+    .legend-swatch.final { border-color: var(--final); }
+    .legend-vehicle { width: 28px; height: 15px; border-radius: 3px; background: #b87331; box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.2); }
+    .legend-vehicle.loaded { position: relative; }
+    .legend-vehicle.loaded::before { content: ""; position: absolute; left: 11px; top: -8px; width: 13px; height: 8px; background: var(--steel); clip-path: polygon(0 0, 82% 0, 100% 30%, 100% 100%, 0 100%); }
+    .legend-route { height: 2px; border-top: 3px dashed var(--accent); }
+    .legend-grid { width: 28px; height: 17px; border: 1px solid rgba(255, 255, 255, 0.22); background: linear-gradient(90deg, rgba(255, 255, 255, 0.18) 1px, transparent 1px), linear-gradient(180deg, rgba(255, 255, 255, 0.18) 1px, transparent 1px), #214162; background-size: 7px 7px; }
+    .legend-fit { width: 28px; height: 17px; border: 1px solid rgba(255, 255, 255, 0.22); background: linear-gradient(90deg, #4a95d8 0 45%, transparent 45%), linear-gradient(180deg, transparent 0 48%, #4a95d8 48% 100%), rgba(255, 255, 255, 0.08); }
+
+    .placement-detail {
+      display: grid;
+      gap: 8px;
+      color: #dce8f8;
+      font-size: 11px;
+    }
+
+    .placement-detail .detail-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: center;
+      font-weight: 700;
+    }
+
+    .placement-detail .detail-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    .placement-detail .detail-cell {
+      padding: 7px;
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      border-radius: 6px;
+      background: rgba(4, 11, 20, 0.34);
+    }
+
+    .placement-detail .detail-label {
+      display: block;
+      margin-bottom: 3px;
+      color: var(--muted);
+      font-size: 9px;
+      text-transform: uppercase;
+    }
+
+    .viewer3d-card {
+      margin-top: 12px;
+      padding: 22px;
+      border-radius: 8px;
+      min-height: 380px;
+      background:
+        linear-gradient(180deg, rgba(14, 31, 52, 0.92), rgba(5, 13, 24, 0.94));
+      border: 1px solid rgba(156, 199, 244, 0.14);
+      box-shadow: 0 22px 60px rgba(0, 0, 0, 0.28);
+    }
+
+    .viewer3d-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .viewer3d-head h2 {
+      margin: 0;
+      color: #dceaff;
+      font-size: clamp(24px, 2vw, 34px);
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      text-shadow: 0 0 18px rgba(96, 165, 250, 0.34);
+    }
+
+    .viewer3d-titlegroup {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .viewer3d-subtitle {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .viewer3d-badge {
+      padding: 6px 9px;
+      border: 1px solid rgba(96, 165, 250, 0.26);
+      border-radius: 999px;
+      color: #b8d9ff;
+      background: rgba(35, 75, 116, 0.28);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .viewer3d-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .viewer3d-actions button {
+      min-width: 86px;
+      padding: 7px 10px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 6px;
+      background: linear-gradient(180deg, #213755, #17263d);
+      color: #e6f0ff;
+      cursor: pointer;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    }
+
+    .viewer3d-scene {
+      position: relative;
+      height: min(680px, calc(100vh - 300px));
+      min-height: 560px;
+      overflow: hidden;
+      border: 1px solid rgba(129, 179, 231, 0.16);
+      border-radius: 8px;
+      background:
+        radial-gradient(circle at 50% 26%, rgba(86, 166, 255, 0.16), transparent 46%),
+        radial-gradient(circle at 50% 82%, rgba(31, 64, 105, 0.28), transparent 58%),
+        linear-gradient(180deg, rgba(8, 20, 35, 0.98), rgba(2, 8, 16, 0.98));
+      perspective: 900px;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.05),
+        inset 0 -80px 130px rgba(0, 0, 0, 0.24);
+    }
+
+    .viewer3d-scene canvas {
+      position: absolute;
+      inset: 0;
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .viewer3d-scene.webgl .viewer3d-world {
+      display: none;
+    }
+
+    .viewer3d-world {
+      position: absolute;
+      left: 50%;
+      top: 48%;
+      width: 1120px;
+      height: 260px;
+      transform-style: preserve-3d;
+      transform: translate(-50%, -50%) rotateX(58deg) rotateZ(-32deg);
+      transition: transform 220ms ease;
+    }
+
+    .viewer3d-scene.top .viewer3d-world {
+      transform: translate(-50%, -50%) rotateX(0deg) rotateZ(0deg) scale(0.88);
+    }
+
+    .viewer3d-board {
+      position: absolute;
+      width: 250px;
+      height: 170px;
+      transform-style: preserve-3d;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 4px;
+      background:
+        linear-gradient(90deg, rgba(216, 233, 255, 0.14) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(216, 233, 255, 0.14) 1px, transparent 1px),
+        rgba(8, 22, 36, 0.88);
+      background-size: calc(100% / var(--cols)) calc(100% / var(--rows));
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.42);
+    }
+
+    .viewer3d-board::after {
+      content: attr(data-name);
+      position: absolute;
+      left: 8px;
+      top: -22px;
+      color: #dceaff;
+      font-size: 12px;
+      font-weight: 700;
+      transform: translateZ(18px);
+    }
+
+    .viewer3d-box,
+    .viewer3d-slot {
+      position: absolute;
+      transform-style: preserve-3d;
+      border-radius: 3px;
+    }
+
+    .viewer3d-box {
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.03)), var(--box-color);
+      border: 1px solid rgba(255, 255, 255, 0.36);
+      box-shadow: 0 0 var(--box-height) rgba(0, 0, 0, 0.45);
+      transform: translateZ(var(--box-height));
+    }
+
+    .viewer3d-box::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.18);
+      transform: translateY(100%) rotateX(90deg);
+      transform-origin: top;
+    }
+
+    .viewer3d-box::after {
+      content: attr(data-id);
+      position: absolute;
+      left: 4px;
+      top: 4px;
+      color: #f8fbff;
+      font-size: 9px;
+      font-weight: 700;
+      text-shadow: 0 1px 2px #000;
+      transform: translateZ(2px);
+    }
+
+    .viewer3d-slot {
+      border: 2px solid rgba(246, 211, 107, 0.85);
+      background: rgba(246, 211, 107, 0.11);
+      transform: translateZ(4px);
+    }
+
+    .viewer3d-slot.planned {
+      border-color: rgba(255, 255, 255, 0.55);
+      background: rgba(255, 255, 255, 0.06);
+      transform: translateZ(3px);
+    }
+
+    .viewer3d-note {
+      position: absolute;
+      left: 12px;
+      bottom: 10px;
+      color: var(--muted);
+      font-size: 11px;
+      z-index: 2;
+    }
+
+    .viewer3d-legend,
+    .viewer3d-placement-hud {
+      position: absolute;
+      z-index: 3;
+      border: 1px solid rgba(96, 165, 250, 0.24);
+      border-radius: 8px;
+      background: rgba(3, 12, 24, 0.76);
+      box-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
+      backdrop-filter: blur(6px);
+    }
+
+    .viewer3d-legend {
+      left: 18px;
+      top: 18px;
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      padding: 12px 14px;
+      color: #b8d9ff;
+      font-size: 12px;
+    }
+
+    .viewer3d-legend strong {
+      color: #edf5ff;
+      font-size: 11px;
+      text-transform: uppercase;
+    }
+
+    .viewer3d-legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .viewer3d-legend i {
+      width: 11px;
+      height: 11px;
+      display: inline-block;
+      border-radius: 2px;
+      background: var(--legend-color);
+      box-shadow: 0 0 12px color-mix(in srgb, var(--legend-color), transparent 35%);
+    }
+
+    .viewer3d-placement-hud {
+      right: 18px;
+      top: 18px;
+      min-width: 290px;
+      padding: 14px 16px;
+      color: #b8d9ff;
+      font-size: 12px;
+    }
+
+    .viewer3d-placement-hud .hud-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      color: #edf5ff;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .viewer3d-placement-hud .hud-chip {
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgba(40, 145, 93, 0.45);
+      color: #9ff5c5;
+      font-size: 10px;
+    }
+
+    .viewer3d-placement-hud .hud-title {
+      margin-bottom: 8px;
+      color: #ffffff;
+      font-size: 18px;
+      font-weight: 800;
+    }
+
+    .viewer3d-placement-hud .hud-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      margin-top: 5px;
+    }
+
+    .viewer3d-module-labels {
+      position: absolute;
+      left: 42px;
+      right: 42px;
+      top: 42%;
+      z-index: 3;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 34px;
+      pointer-events: none;
+    }
+
+    .viewer3d-module-labels span {
+      justify-self: start;
+      padding: 7px 12px;
+      border: 1px solid rgba(96, 165, 250, 0.45);
+      border-radius: 7px;
+      color: #dceaff;
+      background: rgba(4, 15, 30, 0.76);
+      box-shadow: 0 0 20px rgba(55, 137, 230, 0.18);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    #jsonInput { display: none; }
+
+    @media (max-width: 1380px) {
+      .topbar,
+      .dashboard { grid-template-columns: 1fr; }
+      .metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .playback-controls { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .process-strip { gap: 24px; }
+    }
+
+    @media (max-width: 980px) {
+      .process-strip { grid-template-columns: 1fr; }
+      .route-svg,
+      .transporters-layer { display: none; }
+      .simulation-shell { overflow: visible; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <section class="title-panel">
+        <div>
+          <h1>SHIPYARD BLOCK PROCESS SIMULATION</h1>
+          <div class="subline">
+            <span>DEVS event log playback</span>
+            <span>MES dispatch view</span>
+            <span>Soji &rarr; Painting &rarr; Storage &rarr; PE</span>
+          </div>
+          <div class="playback-controls" aria-label="Playback controls">
+            <label class="control-field">
+              <span>Case</span>
+              <select id="caseSelect">
+                <option value="case1">Sample Case 1</option>
+                <option value="case2">Sample Case 2</option>
+                <option value="loaded" disabled>Loaded JSON (upload)</option>
+              </select>
+            </label>
+            <label class="control-field">
+              <span>Speed</span>
+              <select id="speedSelect">
+                <option value="0.5">0.5x</option>
+                <option value="1" selected>1x</option>
+                <option value="2">2x</option>
+                <option value="4">4x</option>
+              </select>
+            </label>
+            <button class="primary" id="startBtn">Start</button>
+            <button id="pauseBtn">Pause</button>
+            <button id="resetBtn">Reset</button>
+            <button id="loadJsonBtn">Load JSON File</button>
+            <input id="jsonInput" type="file" accept="application/json,.json" />
+          </div>
+        </div>
+        <div class="clock">
+          <span>Simulation Time</span>
+          <strong id="simTime">00:00</strong>
+        </div>
+      </section>
+
+      <section class="metrics" aria-label="Process KPI cards">
+        <div class="metric-card">
+          <div class="label">Total Blocks</div>
+          <div class="value" id="kpiTotal">0</div>
+          <div class="hint" id="caseHint">sample case</div>
+        </div>
+        <div class="metric-card">
+          <div class="label">In Process</div>
+          <div class="value" id="kpiProcess">0</div>
+          <div class="hint">Soji, Painting, PE work</div>
+        </div>
+        <div class="metric-card">
+          <div class="label">Ready for Pickup</div>
+          <div class="value" id="kpiReady">0</div>
+          <div class="hint">MES dispatch candidates</div>
+        </div>
+        <div class="metric-card">
+          <div class="label">Stored</div>
+          <div class="value" id="kpiStored">0</div>
+          <div class="hint">temporary buffer blocks</div>
+        </div>
+        <div class="metric-card">
+          <div class="label">Final Complete</div>
+          <div class="value" id="kpiCompleted">0</div>
+          <div class="hint">PE final complete</div>
+        </div>
+        <div class="metric-card">
+          <div class="label">Transporters</div>
+          <div class="value" id="kpiTransporters">4</div>
+          <div class="hint" id="kpiTransporterHint">fleet standby</div>
+        </div>
+      </section>
+    </header>
+
+
+    <section class="viewer3d-card">
+      <div class="viewer3d-head">
+        <div class="viewer3d-titlegroup">
+          <h2>3D Placement Playback</h2>
+          <span class="viewer3d-subtitle">Event-driven grid allocation replay</span>
+        </div>
+        <div class="viewer3d-actions">
+          <span class="viewer3d-badge">Dynamic Placement Optimizer</span>
+          <label><input id="candidateToggle" type="checkbox" checked> selected slot</label>
+        </div>
+      </div>
+      <div class="viewer3d-scene" id="viewer3dScene">
+        <div class="viewer3d-world" id="viewer3dWorld"></div>
+        <div class="viewer3d-legend">
+          <strong>Placement View</strong>
+          <span><i style="--legend-color:#f6d36b"></i>Selected Slot</span>
+          <span><i style="--legend-color:#93c5fd"></i>Grid Board</span>
+        </div>
+        <div class="viewer3d-placement-hud" id="webglPlacementHud"></div>
+        <div class="viewer3d-module-labels">
+          <span>Soji</span>
+          <span>Painting</span>
+          <span>Storage</span>
+          <span>PE</span>
+        </div>
+        <div class="viewer3d-note">3D visualization: dynamic grid placement result, not physical 3D collision simulation.</div>
+      </div>
+    </section>
+
+    <section class="dashboard">
+      <article class="dashboard-card">
+        <h2>Process Flow</h2>
+        <div class="flow">
+          <div class="flow-node"><strong>Soji</strong><span>Surface Preparation</span></div>
+          <div class="flow-arrow">&rarr;</div>
+          <div class="flow-node"><strong>Painting</strong><span>Coating Process</span></div>
+          <div class="flow-arrow">&rarr;</div>
+          <div class="flow-node"><strong>Storage</strong><span>Temporary Buffer / Yard Allocation</span></div>
+          <div class="flow-arrow">&rarr;</div>
+          <div class="flow-node"><strong>PE</strong><span>Pre-Erection</span></div>
+        </div>
+      </article>
+      <article class="dashboard-card">
+        <h2>Transporter Status</h2>
+        <div class="status-row"><span>Total</span><span class="pill" id="trTotal">4</span></div>
+        <div class="status-row"><span>Active</span><span class="pill ok" id="trActive">0</span></div>
+        <div class="status-row"><span>Loaded</span><span class="pill warn" id="trLoaded">0</span></div>
+        <div class="status-row"><span>Empty</span><span class="pill blue" id="trEmpty">4</span></div>
+        <div class="status-row"><span>Current Move Plan</span><span class="pill" id="movePlan">Standby</span></div>
+      </article>
+      <article class="dashboard-card">
+        <h2>Process Zone Utilization</h2>
+        <div class="util-list" id="utilList"></div>
+      </article>
+      <article class="dashboard-card">
+        <h2>Block Status Summary</h2>
+        <div class="summary-list" id="summaryList"></div>
+      </article>
+      <article class="dashboard-card">
+        <h2>Capa Result / Analyzer</h2>
+        <div class="analyzer-list" id="analyzerList"></div>
+      </article>
+      <article class="dashboard-card">
+        <h2>Placement Detail</h2>
+        <div class="placement-detail" id="placementDetail"></div>
+      </article>
+      <article class="dashboard-card">
+        <h2>Legend</h2>
+        <div class="legend">
+          <div class="legend-item"><span class="legend-swatch" style="--swatch: var(--steel);"></span><span>Processing Block</span></div>
+          <div class="legend-item"><span class="legend-swatch ready" style="--swatch: #8fb6c4;"></span><span>Ready for Pickup</span></div>
+          <div class="legend-item"><span class="legend-swatch" style="--swatch: #4a95d8;"></span><span>Stored Block</span></div>
+          <div class="legend-item"><span class="legend-swatch final" style="--swatch: #6aa982;"></span><span>Final Complete</span></div>
+          <div class="legend-item"><span class="legend-vehicle"></span><span>Transporter Empty</span></div>
+          <div class="legend-item"><span class="legend-vehicle loaded"></span><span>Transporter Loaded</span></div>
+          <div class="legend-item"><span class="legend-route"></span><span>MES-directed Route</span></div>
+          <div class="legend-item"><span class="legend-grid"></span><span>Process Grid Area</span></div>
+          <div class="legend-item"><span class="legend-fit"></span><span>Optimized Placement</span></div>
+        </div>
+      </article>
+    </section>
+  </div>
+
+  <script>
+    const MODULE_ORDER = ["Soji", "Painting", "Storage", "PE"];
+    const MODULE_META = {
+      Soji: { id: "SOJI-01", desc: "Surface Preparation", cols: 12, rows: 8, color: "#a7663d" },
+      Painting: { id: "PAINT-01", desc: "Coating Process", cols: 12, rows: 8, color: "#aa5750" },
+      Storage: { id: "STG-01", desc: "Temporary Buffer / Yard Allocation", cols: 12, rows: 8, color: "#4a95d8" },
+      PE: { id: "PE-01", desc: "Pre-Erection", cols: 12, rows: 8, color: "#7f8995" }
+    };
+
+    const statusLabels = {
+      processing: "PROC",
+      ready: "READY",
+      stored: "STORED",
+      moving: "MOVE",
+      final: "FINAL"
+    };
+
+    const statusColors = {
+      processing: "#8795a5",
+      ready: "#8fb6c4",
+      stored: "#5f7f9f",
+      moving: "#d8e8ff",
+      final: "#6aa982"
+    };
+
+    const caseSelect = document.getElementById("caseSelect");
+    const speedSelect = document.getElementById("speedSelect");
+    const jsonInput = document.getElementById("jsonInput");
+    const viewer3dScene = document.getElementById("viewer3dScene");
+    const viewer3dWorld = document.getElementById("viewer3dWorld");
+    const webglPlacementHud = document.getElementById("webglPlacementHud");
+    const candidateToggle = document.getElementById("candidateToggle");
+
+    let activeLog = null;
+    let loadedLog = null;
+    let events = [];
+    let currentEventIndex = 0;
+    let simTime = 0;
+    let lastFrame = 0;
+    let playbackFrameId = null;
+    let playing = false;
+    let playbackSpeed = 1;
+    let blocks = {};
+    let transporters = {};
+    let movePlans = {};
+    let dropoffByPlan = {};
+    let analyzerResult = null;
+    let completedBlocks = new Set();
+    let activeRoute = null;
+    let knownBlockIds = new Set();
+    let activePlacement = null;
+    let showCandidateOverlay = true;
+    const VISUAL_MOVE_MIN_DURATION = 1.6;
+
+    function buildSampleCase(caseId, caseName, options) {
+      const modules = MODULE_ORDER.map((name) => ({
+        module_id: MODULE_META[name].id,
+        module_name: name,
+        module_type: name === "Storage" ? "storage" : "process",
+        grid_cols: 12,
+        grid_rows: 8,
+        current_area: 96,
+        required_area: options.capa[MODULE_ORDER.indexOf(name)],
+        area_adjustment: options.capa[MODULE_ORDER.indexOf(name)] - 96,
+        capa_unit: "grid_cells",
+        description: MODULE_META[name].desc
+      }));
+
+      const transporters = ["T-01", "T-02", "T-03", "T-04"].map((id) => ({
+        transporter_id: id,
+        status: "idle",
+        current_location: "Parking"
+      }));
+
+      const sizes = [
+        { cols: 3, rows: 2, type: "curved_block" },
+        { cols: 2, rows: 2, type: "flat_block" },
+        { cols: 4, rows: 1, type: "longitudinal_block" },
+        { cols: 2, rows: 3, type: "side_shell_block" },
+        { cols: 3, rows: 2, type: "deck_block" },
+        { cols: 2, rows: 2, type: "flat_block" },
+        { cols: 3, rows: 1, type: "longitudinal_block" },
+        { cols: 2, rows: 2, type: "curved_block" }
+      ];
+
+      const sojiCells = [{ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 8, y: 0 }, { x: 0, y: 3 }, { x: 3, y: 3 }, { x: 8, y: 3 }, { x: 1, y: 6 }, { x: 6, y: 6 }];
+      const paintCells = options.paintCells || [{ x: 0, y: 0 }, { x: 3, y: 0 }, { x: 6, y: 0 }, { x: 9, y: 0 }, { x: 0, y: 3 }, { x: 4, y: 3 }, { x: 7, y: 3 }, { x: 2, y: 6 }];
+      const storageCells = options.storageCells || [{ x: 0, y: 0 }, { x: 3, y: 0 }, { x: 5, y: 0 }, { x: 9, y: 0 }, { x: 0, y: 2 }, { x: 3, y: 2 }, { x: 6, y: 2 }, { x: 9, y: 2 }];
+      const peCells = options.peCells || [{ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 8, y: 0 }, { x: 0, y: 3 }, { x: 3, y: 3 }, { x: 7, y: 3 }, { x: 1, y: 6 }, { x: 6, y: 6 }];
+
+      const ev = [];
+      let eventNo = 1;
+      const push = (time, type, source, target, port, payload) => {
+        ev.push({ time: Number(time.toFixed(1)), event_id: `E-${String(eventNo++).padStart(4, "0")}`, source, target, port, event_type: type, payload });
+      };
+
+      for (let i = 0; i < 8; i += 1) {
+        const productId = `P-${String(i + 1).padStart(3, "0")}`;
+        const blockId = `B-${String(i + 1).padStart(3, "0")}`;
+        const tr1 = `T-0${(i % 4) + 1}`;
+        const tr2 = `T-0${((i + 1) % 4) + 1}`;
+        const tr3 = `T-0${((i + 2) % 4) + 1}`;
+        const size = sizes[i];
+        const t = options.startOffset + i * options.stagger;
+        const mp1 = `MP-${String(i + 1).padStart(3, "0")}-S-P`;
+        const mp2 = `MP-${String(i + 1).padStart(3, "0")}-P-ST`;
+        const mp3 = `MP-${String(i + 1).padStart(3, "0")}-ST-PE`;
+
+        push(t, "block_created", "Generator", "Soji", "Block out", {
+          product_id: productId, block_id: blockId, block_type: size.type, module: "Soji",
+          assigned_cell: sojiCells[i], block_size: size, status: "processing"
+        });
+        push(t + options.soji, "work_complete_from_process", "Soji", "MES", "work_complete_to_mes", {
+          product_id: productId, block_id: blockId, process_name: "Soji", process_id: "SOJI-01",
+          completion_time: t + options.soji, next_process: "Painting", requires_transport: true,
+          final_stage: false, status: "ready_for_pickup"
+        });
+        push(t + options.soji + 0.2, "move_plan_to_transporter", "MES", "Transporter", "move_plan_to_transporter", {
+          move_plan_id: mp1, transporter_id: tr1, product_id: productId, block_id: blockId,
+          from_module: "Soji", to_module: "Painting", pickup_location_id: "SOJI-01",
+          dropoff_location_id: "PAINT-01", assigned_cell: paintCells[i], required_area: size.cols * size.rows,
+          move_purpose: "pickup_and_delivery"
+        });
+        push(t + options.soji + 0.6, "transporter_pickup", "Transporter", "Soji", "move_to_destination", {
+          move_plan_id: mp1, transporter_id: tr1, block_id: blockId, from_module: "Soji", arrival_type: "pickup"
+        });
+        push(t + options.soji + options.move, "transporter_dropoff", "Transporter", "Painting", "move_to_destination", {
+          move_plan_id: mp1, transporter_id: tr1, block_id: blockId, to_module: "Painting",
+          arrival_type: "dropoff", assigned_cell: paintCells[i], status: "processing"
+        });
+        push(t + options.soji + options.move + 0.7, "return_complete_from_transporter", "Transporter", "MES", "return_complete_to_mes", {
+          transporter_id: tr1, completed_move_plan_id: mp1, current_location: "Parking", status: "idle",
+          return_time: t + options.soji + options.move + 0.7
+        });
+
+        const pDone = t + options.soji + options.move + options.paint;
+        push(pDone, "work_complete_from_process", "Painting", "MES", "work_complete_to_mes", {
+          product_id: productId, block_id: blockId, process_name: "Painting", process_id: "PAINT-01",
+          completion_time: pDone, next_process: "Storage", requires_transport: true,
+          final_stage: false, status: "ready_for_pickup"
+        });
+        push(pDone + 0.2, "move_plan_to_transporter", "MES", "Transporter", "move_plan_to_transporter", {
+          move_plan_id: mp2, transporter_id: tr2, product_id: productId, block_id: blockId,
+          from_module: "Painting", to_module: "Storage", pickup_location_id: "PAINT-01",
+          dropoff_location_id: "STG-01", assigned_cell: storageCells[i], required_area: size.cols * size.rows,
+          move_purpose: "pickup_and_delivery"
+        });
+        push(pDone + 0.6, "transporter_pickup", "Transporter", "Painting", "move_to_destination", {
+          move_plan_id: mp2, transporter_id: tr2, block_id: blockId, from_module: "Painting", arrival_type: "pickup"
+        });
+        push(pDone + options.move, "transporter_dropoff", "Transporter", "Storage", "move_to_destination", {
+          move_plan_id: mp2, transporter_id: tr2, block_id: blockId, to_module: "Storage",
+          arrival_type: "dropoff", assigned_cell: storageCells[i], status: "stored"
+        });
+        push(pDone + options.move + 0.2, "storage_stored", "Storage", "MES", "work_complete_to_mes", {
+          product_id: productId, block_id: blockId, storage_name: "Storage", storage_id: "STG-01",
+          assigned_cell: storageCells[i], required_area: size.cols * size.rows, status: "stored",
+          next_process: "PE", requires_transport: true, final_stage: false
+        });
+        push(pDone + options.move + 0.8, "return_complete_from_transporter", "Transporter", "MES", "return_complete_to_mes", {
+          transporter_id: tr2, completed_move_plan_id: mp2, current_location: "Parking", status: "idle",
+          return_time: pDone + options.move + 0.8
+        });
+
+        const stOut = pDone + options.move + options.storageWait;
+        push(stOut, "move_plan_to_transporter", "MES", "Transporter", "move_plan_to_transporter", {
+          move_plan_id: mp3, transporter_id: tr3, product_id: productId, block_id: blockId,
+          from_module: "Storage", to_module: "PE", pickup_location_id: "STG-01",
+          dropoff_location_id: "PE-01", assigned_cell: peCells[i], required_area: size.cols * size.rows,
+          move_purpose: "pickup_and_delivery"
+        });
+        push(stOut + 0.4, "transporter_pickup", "Transporter", "Storage", "move_to_destination", {
+          move_plan_id: mp3, transporter_id: tr3, block_id: blockId, from_module: "Storage", arrival_type: "pickup"
+        });
+        push(stOut + options.move, "transporter_dropoff", "Transporter", "PE", "move_to_destination", {
+          move_plan_id: mp3, transporter_id: tr3, block_id: blockId, to_module: "PE",
+          arrival_type: "dropoff", assigned_cell: peCells[i], status: "processing"
+        });
+        push(stOut + options.move + 0.8, "return_complete_from_transporter", "Transporter", "MES", "return_complete_to_mes", {
+          transporter_id: tr3, completed_move_plan_id: mp3, current_location: "Parking", status: "idle",
+          return_time: stOut + options.move + 0.8
+        });
+        push(stOut + options.move + options.pe, "final_complete", "PE", "MES", "work_complete_to_mes", {
+          product_id: productId, block_id: blockId, process_name: "PE", process_id: "PE-01",
+          completion_time: stOut + options.move + options.pe, status: "final_complete", final_stage: true
+        });
+      }
+
+      const resultTime = Math.max(...ev.map((item) => item.time)) + 2;
+      push(resultTime, "operation_result_to_analyzer", "MES", "Analyzer", "operation_result_to_analyzer", {
+        case_id: caseId,
+        required_capa_by_process: [
+          { process_name: "Soji", current_capa: 96, required_capa: options.capa[0], adjustment: options.capa[0] - 96, capa_unit: "grid_cells" },
+          { process_name: "Painting", current_capa: 96, required_capa: options.capa[1], adjustment: options.capa[1] - 96, capa_unit: "grid_cells" },
+          { process_name: "Storage", current_capa: 96, required_capa: options.capa[2], adjustment: options.capa[2] - 96, capa_unit: "grid_cells" },
+          { process_name: "PE", current_capa: 96, required_capa: options.capa[3], adjustment: options.capa[3] - 96, capa_unit: "grid_cells" }
+        ]
+      });
+
+      return {
+        meta: {
+          case_id: caseId,
+          case_name: caseName,
+          time_unit: "min",
+          block_count: 8,
+          transporter_count: 4,
+          due_days: options.dueDays || 6,
+          description: "DEVS event log playback for shipyard block process simulation"
+        },
+        modules,
+        initial_state: { transporters, blocks: [] },
+        events: ev.sort((a, b) => a.time - b.time)
+      };
+    }
+
+    const SAMPLE_CASE_1 = buildSampleCase("case_1", "Fixed start/end time", {
+      startOffset: 0, stagger: 2.2, soji: 6.0, paint: 7.0, storageWait: 6.5, pe: 7.5, move: 3.0, dueDays: 6, capa: [58, 66, 74, 62]
+    });
+
+    const SAMPLE_CASE_2 = buildSampleCase("case_2", "Leveled buffer dispatch", {
+      startOffset: 0, stagger: 1.8, soji: 5.0, paint: 6.0, storageWait: 4.5, pe: 6.0, move: 2.4, dueDays: 7, capa: [48, 52, 65, 55],
+      storageCells: [{ x: 0, y: 0 }, { x: 3, y: 0 }, { x: 5, y: 0 }, { x: 8, y: 0 }, { x: 0, y: 2 }, { x: 3, y: 2 }, { x: 5, y: 2 }, { x: 8, y: 2 }],
+      paintCells: [{ x: 0, y: 0 }, { x: 3, y: 0 }, { x: 6, y: 0 }, { x: 9, y: 0 }, { x: 0, y: 3 }, { x: 3, y: 3 }, { x: 6, y: 3 }, { x: 9, y: 3 }]
+    });
+
+    function loadEventLog(json) {
+      activeLog = JSON.parse(JSON.stringify(json));
+      events = (activeLog.events || []).slice().sort((a, b) => a.time - b.time);
+      dropoffByPlan = {};
+      events.forEach((event) => {
+        if (event.event_type === "transporter_dropoff" && event.payload?.move_plan_id) {
+          dropoffByPlan[event.payload.move_plan_id] = event;
+        }
+      });
+      configureModules(activeLog.modules || []);
+      resetSimulation();
+    }
+
+    function configureModules(modules) {
+      modules.forEach((module) => {
+        const name = normalizeModule(module.module_name || module.module_id);
+        if (!MODULE_META[name]) return;
+        MODULE_META[name].id = module.module_id || MODULE_META[name].id;
+        MODULE_META[name].desc = module.description || module.module_description || MODULE_META[name].desc;
+        MODULE_META[name].cols = module.grid_cols || MODULE_META[name].cols;
+        MODULE_META[name].rows = module.grid_rows || MODULE_META[name].rows;
+        MODULE_META[name].currentArea = module.current_area ?? (MODULE_META[name].cols * MODULE_META[name].rows);
+        MODULE_META[name].peakArea = module.peak_area ?? MODULE_META[name].peakArea ?? null;
+        MODULE_META[name].requiredArea = module.required_area ?? MODULE_META[name].requiredArea ?? null;
+        MODULE_META[name].areaAdjustment = module.area_adjustment ?? MODULE_META[name].areaAdjustment ?? null;
+        MODULE_META[name].recommendation = module.recommendation || MODULE_META[name].recommendation || null;
+        MODULE_META[name].capaUnit = module.capa_unit || MODULE_META[name].capaUnit || "grid_cells";
+        const stage = document.querySelector(`[data-stage="${name}"]`);
+        if (stage) {
+          const title = stage.querySelector(".stage-name");
+          const desc = stage.querySelector(".stage-desc");
+          if (title) title.textContent = name;
+          if (desc) desc.textContent = MODULE_META[name].desc;
+        }
+        const grid = document.getElementById(`grid-${name}`);
+        if (grid) {
+          grid.style.setProperty("--cols", MODULE_META[name].cols);
+          grid.style.setProperty("--rows", MODULE_META[name].rows);
+        }
+      });
+    }
+
+    function resetSimulation() {
+      playing = false;
+      if (playbackFrameId) {
+        cancelAnimationFrame(playbackFrameId);
+        playbackFrameId = null;
+      }
+      simTime = 0;
+      currentEventIndex = 0;
+      blocks = {};
+      transporters = {};
+      movePlans = {};
+      analyzerResult = null;
+      completedBlocks = new Set();
+      activeRoute = null;
+      knownBlockIds = new Set();
+      activePlacement = null;
+
+      const initial = activeLog?.initial_state || {};
+      (initial.transporters || []).forEach((item) => ensureTransporter(item.transporter_id, item));
+      const fallbackTransporters = Number(activeLog?.meta?.transporter_count || 4);
+      if (Object.keys(transporters).length === 0) {
+        while (Object.keys(transporters).length < fallbackTransporters) {
+          const next = `T-${String(Object.keys(transporters).length + 1).padStart(2, "0")}`;
+          ensureTransporter(next, { transporter_id: next, status: "idle", current_location: "Parking" });
+        }
+      }
+      (initial.blocks || []).forEach((block) => createOrUpdateBlockFromPayload(block, normalizeModule(block.module || block.stage || "Soji")));
+      updateClock();
+      updateDashboard();
+      render3DViewer();
+    }
+
+    function startPlayback() {
+      if (playing) return;
+      playing = true;
+      lastFrame = performance.now();
+      playbackFrameId = requestAnimationFrame(playbackLoop);
+    }
+
+    function pausePlayback() {
+      playing = false;
+      if (playbackFrameId) {
+        cancelAnimationFrame(playbackFrameId);
+        playbackFrameId = null;
+      }
+    }
+
+    function seekToTime(time) {
+      const wasPlaying = playing;
+      resetSimulation();
+      simTime = Math.max(0, time);
+      while (currentEventIndex < events.length && events[currentEventIndex].time <= simTime) {
+        applyEvent(events[currentEventIndex]);
+        currentEventIndex += 1;
+      }
+      playing = wasPlaying;
+      updateClock();
+      updateDashboard();
+      render3DViewer();
+    }
+
+    function applyEvent(event) {
+      const payload = event.payload || {};
+      switch (event.event_type) {
+        case "block_created":
+          createOrUpdateBlockFromPayload(payload, normalizeModule(payload.module || event.target));
+          break;
+        case "work_complete_from_process":
+          handleWorkComplete(payload, event.source);
+          break;
+        case "move_plan_to_transporter":
+          handleMovePlan(payload);
+          break;
+        case "transporter_pickup":
+          handlePickup(payload, event.time);
+          break;
+        case "transporter_dropoff":
+          handleDropoff(payload, event.time);
+          break;
+        case "storage_stored":
+          handleStorageStored(payload);
+          break;
+        case "final_complete":
+          handleFinalComplete(payload);
+          break;
+        case "return_complete_from_transporter":
+          handleReturnComplete(payload);
+          break;
+        case "operation_result_to_analyzer":
+          analyzerResult = payload;
+          break;
+        default:
+          break;
+      }
+    }
+
+    function animateTransporter(transporter_id, from_module, to_module, start_time, end_time) {
+      const tr = ensureTransporter(transporter_id);
+      const safeEnd = Number.isFinite(Number(end_time)) ? Number(end_time) : start_time;
+      tr.activeMove = {
+        from: normalizeModule(from_module),
+        to: normalizeModule(to_module),
+        start: start_time,
+        end: Math.max(start_time + VISUAL_MOVE_MIN_DURATION, safeEnd)
+      };
+      tr.status = tr.loadedBlockId ? "loaded" : "moving";
+      activeRoute = `${tr.activeMove.from}-${tr.activeMove.to}`;
+    }
+
+    function createOrUpdateBlockFromPayload(payload, moduleName) {
+      const id = payload.block_id || payload.id;
+      if (!id) return;
+      const placementResult = getPlacementResult(payload);
+      const scheduleContext = getScheduleContext(payload, placementResult);
+      const placementRect = placementResult?.assigned_rect;
+      const size = placementRect
+        ? { cols: placementRect.w, rows: placementRect.h }
+        : payload.block_size || { cols: payload.cols || 2, rows: payload.rows || 2 };
+      const preferred = payload.assigned_cell || placementResult?.assigned_cell;
+      const cell = preferred && isAreaOpen(moduleName, preferred.x, preferred.y, size.cols, size.rows, id)
+        ? preferred
+        : findFirstOpen(moduleName, size.cols, size.rows, id) || { x: 0, y: 0 };
+      const status = normalizeStatus(payload.status || "processing", moduleName);
+      blocks[id] = {
+        id,
+        productId: payload.product_id || "",
+        type: payload.block_type || "flat_block",
+        typeLabel: payload.block_type_label || payload.block_type || "Flat Block",
+        priority: payload.priority || "P2",
+        fitDifficulty: payload.fit_difficulty || "easy",
+        processTime: payload.process_time || {},
+        plannedSchedule: payload.planned_schedule || {},
+        scheduleContext,
+        placement: placementResult || {},
+        module: moduleName,
+        x: cell.x,
+        y: cell.y,
+        w: size.cols,
+        h: size.rows,
+        status,
+        moving: false,
+        shape: getShapeForBlock(id, payload.block_type),
+        color: getColorForStatus(status, moduleName)
+      };
+      knownBlockIds.add(id);
+      if (placementResult?.status) {
+        activePlacement = { module: moduleName, blockId: id, block: blocks[id], placement: placementResult, scheduleContext };
+      }
+    }
+
+    function handleWorkComplete(payload, source) {
+      const id = payload.block_id;
+      const moduleName = normalizeModule(payload.process_name || source);
+      if (!blocks[id] || moduleName === "Storage") return;
+      blocks[id].processTime = { ...(blocks[id].processTime || {}), [moduleName]: payload.process_time };
+      blocks[id].priority = payload.priority || blocks[id].priority;
+      blocks[id].status = "ready";
+      blocks[id].moving = false;
+      blocks[id].color = getColorForStatus("ready", moduleName);
+    }
+
+    function handleMovePlan(payload) {
+      movePlans[payload.move_plan_id] = payload;
+      const tr = ensureTransporter(payload.transporter_id);
+      tr.status = "dispatch";
+      tr.plan = `${payload.block_id}: ${payload.from_module} to ${payload.to_module}`;
+      tr.from = normalizeModule(payload.from_module);
+      tr.to = normalizeModule(payload.to_module);
+      tr.current_location = payload.from_module;
+      activeRoute = `${tr.from}-${tr.to}`;
+    }
+
+    function handlePickup(payload, eventTime) {
+      const tr = ensureTransporter(payload.transporter_id);
+      const block = blocks[payload.block_id];
+      const plan = movePlans[payload.move_plan_id] || {};
+      if (block) {
+        block.moving = true;
+        block.status = "moving";
+      }
+      tr.loadedBlockId = payload.block_id;
+      tr.visualLoadedBlockId = payload.block_id;
+      tr.visualLoadedUntil = eventTime + VISUAL_MOVE_MIN_DURATION;
+      tr.status = "loaded";
+      tr.plan = `${payload.block_id}: ${plan.from_module || payload.from_module} to ${plan.to_module || "Next"}`;
+      const dropoff = dropoffByPlan[payload.move_plan_id];
+      animateTransporter(payload.transporter_id, plan.from_module || payload.from_module, plan.to_module || dropoff?.payload?.to_module || "Parking", eventTime, dropoff?.time || eventTime + 3);
+    }
+
+    function handleDropoff(payload, eventTime) {
+      const tr = ensureTransporter(payload.transporter_id);
+      const toModule = normalizeModule(payload.to_module || "Soji");
+      let block = blocks[payload.block_id];
+      if (!block) {
+        block = { id: payload.block_id, w: 2, h: 2, shape: getShapeForBlock(payload.block_id), type: "flat_block" };
+        blocks[payload.block_id] = block;
+      }
+      const placementResult = getPlacementResult(payload);
+      const scheduleContext = getScheduleContext(payload, placementResult);
+      const placementRect = placementResult?.assigned_rect;
+      if (placementRect) {
+        block.w = placementRect.w;
+        block.h = placementRect.h;
+      }
+      const preferred = payload.assigned_cell || placementResult?.assigned_cell;
+      const cell = preferred && isAreaOpen(toModule, preferred.x, preferred.y, block.w, block.h, payload.block_id)
+        ? preferred
+        : findFirstOpen(toModule, block.w, block.h, payload.block_id) || { x: 0, y: 0 };
+      block.module = toModule;
+      block.type = payload.block_type || block.type;
+      block.typeLabel = payload.block_type_label || block.typeLabel || block.type;
+      block.priority = payload.priority || block.priority || "P2";
+      block.fitDifficulty = payload.fit_difficulty || block.fitDifficulty || "easy";
+      block.processTime = payload.process_time || block.processTime || {};
+      block.plannedSchedule = payload.planned_schedule || block.plannedSchedule || {};
+      block.scheduleContext = scheduleContext;
+      block.placement = placementResult || block.placement || {};
+      block.x = cell.x;
+      block.y = cell.y;
+      block.moving = false;
+      block.status = normalizeStatus(payload.status || (toModule === "Storage" ? "stored" : "processing"), toModule);
+      block.color = getColorForStatus(block.status, toModule);
+      const visualEnd = Math.max(tr.activeMove?.end || eventTime || simTime, (eventTime || simTime) + 0.25);
+      tr.visualLoadedBlockId = tr.visualLoadedBlockId || payload.block_id;
+      tr.visualLoadedUntil = Math.max(tr.visualLoadedUntil || 0, visualEnd);
+      tr.loadedBlockId = null;
+      tr.status = "empty";
+      tr.current_location = toModule;
+      if (!tr.activeMove || simTime >= tr.activeMove.end) {
+        tr.activeMove = null;
+      }
+      if (placementResult?.status) {
+        activePlacement = { module: toModule, blockId: payload.block_id, block, placement: placementResult, scheduleContext };
+      }
+    }
+
+    function handleStorageStored(payload) {
+      const block = blocks[payload.block_id];
+      if (!block) return;
+      const placementResult = getPlacementResult(payload);
+      const scheduleContext = getScheduleContext(payload, placementResult);
+      const placementRect = placementResult?.assigned_rect;
+      if (placementRect) {
+        block.w = placementRect.w;
+        block.h = placementRect.h;
+      }
+      const cell = payload.assigned_cell || placementResult?.assigned_cell || { x: block.x, y: block.y };
+      block.module = "Storage";
+      block.type = payload.block_type || block.type;
+      block.typeLabel = payload.block_type_label || block.typeLabel || block.type;
+      block.priority = payload.priority || block.priority || "P2";
+      block.fitDifficulty = payload.fit_difficulty || block.fitDifficulty || "easy";
+      block.plannedSchedule = payload.planned_schedule || block.plannedSchedule || {};
+      block.scheduleContext = scheduleContext;
+      block.placement = placementResult || block.placement || {};
+      block.x = cell.x;
+      block.y = cell.y;
+      block.status = "stored";
+      block.moving = false;
+      block.color = getColorForStatus("stored", "Storage");
+      if (placementResult?.status) {
+        activePlacement = { module: "Storage", blockId: payload.block_id, block, placement: placementResult, scheduleContext };
+      }
+    }
+
+    function handleFinalComplete(payload) {
+      const block = blocks[payload.block_id];
+      completedBlocks.add(payload.block_id);
+      if (!block) return;
+      delete blocks[payload.block_id];
+    }
+
+    function handleReturnComplete(payload) {
+      const tr = ensureTransporter(payload.transporter_id);
+      tr.status = "idle";
+      tr.loadedBlockId = null;
+      if (!tr.visualLoadedUntil || simTime >= tr.visualLoadedUntil) {
+        tr.visualLoadedBlockId = null;
+      }
+      tr.current_location = payload.current_location || "Parking";
+      tr.plan = "Standby";
+      if (!tr.activeMove || simTime >= tr.activeMove.end) {
+        tr.activeMove = null;
+      }
+    }
+
+    function updateDashboard() {
+      const visibleBlocks = Object.values(blocks);
+      const counts = {
+        processing: visibleBlocks.filter((block) => block.status === "processing").length,
+        ready: visibleBlocks.filter((block) => block.status === "ready").length,
+        moving: visibleBlocks.filter((block) => block.moving || block.status === "moving").length,
+        stored: visibleBlocks.filter((block) => block.status === "stored").length,
+        final: completedBlocks.size
+      };
+      const transporterList = Object.values(transporters);
+      const active = transporterList.filter((tr) => tr.status !== "idle").length;
+      const loaded = transporterList.filter((tr) => tr.loadedBlockId).length;
+      const plannedBlocks = Number(activeLog?.meta?.block_count || knownBlockIds.size);
+      const dueDays = activeLog?.meta?.due_days;
+
+      document.getElementById("kpiTotal").textContent = plannedBlocks || knownBlockIds.size;
+      document.getElementById("kpiProcess").textContent = counts.processing;
+      document.getElementById("kpiReady").textContent = counts.ready;
+      document.getElementById("kpiStored").textContent = counts.stored;
+      document.getElementById("kpiCompleted").textContent = counts.final;
+      document.getElementById("kpiTransporters").textContent = transporterList.length;
+      document.getElementById("kpiTransporterHint").textContent = active ? `${active} active / ${loaded} loaded` : "fleet standby";
+      document.getElementById("caseHint").textContent = `${activeLog?.meta?.case_name || "loaded event log"}${dueDays ? ` | due ${dueDays}d` : ""}`;
+
+      document.getElementById("trTotal").textContent = transporterList.length;
+      document.getElementById("trActive").textContent = active;
+      document.getElementById("trLoaded").textContent = loaded;
+      document.getElementById("trEmpty").textContent = transporterList.length - loaded;
+      document.getElementById("movePlan").textContent = transporterList.find((tr) => tr.status !== "idle")?.plan || "Standby";
+
+      renderUtilization();
+      renderSummary(counts);
+      renderAnalyzer();
+      renderPlacementDetail();
+    }
+
+    function renderPlacementDetail() {
+      const panel = document.getElementById("placementDetail");
+      if (!panel) return;
+      const placement = activePlacement?.placement;
+      if (!placement) {
+        panel.innerHTML = `
+          <div class="detail-head"><span>No placement selected</span><span class="pill">Waiting</span></div>
+          <div class="analyzer-note">Playback a dropoff/storage event with placement_result to inspect score and constraints.</div>
+        `;
+        return;
+      }
+      const block = activePlacement.block || blocks[activePlacement.blockId] || {};
+      const context = activePlacement.scheduleContext || placement.schedule_context || {};
+      const score = placement.score || {};
+      const candidates = placement.candidate_summary || {};
+      const after = placement.grid_metrics_after || {};
+      const largest = after.largest_free_rect || {};
+      const violations = placement.infeasible_reason_count || {};
+      panel.innerHTML = `
+        <div class="detail-head">
+          <span>${activePlacement.blockId} / ${activePlacement.module}</span>
+          <span class="pill ${placement.status === "assigned" ? "ok" : "danger"}">${placement.status || "unknown"}</span>
+        </div>
+        <div class="detail-grid">
+          <div class="detail-cell"><span class="detail-label">Type / Priority</span>${block.typeLabel || block.type || "-"} / ${block.priority || "-"}</div>
+          <div class="detail-cell"><span class="detail-label">Slot</span>${formatRect(placement.assigned_rect)} / R${placement.orientation ?? 0}</div>
+          <div class="detail-cell"><span class="detail-label">Planned / Actual</span>${formatNumber(context.planned_arrival_time)} / ${formatNumber(context.actual_arrival_time)}</div>
+          <div class="detail-cell"><span class="detail-label">Deviation</span>${formatDeviation(context.arrival_deviation)}</div>
+          <div class="detail-cell"><span class="detail-label">Score</span>${score.total ?? "-"}</div>
+          <div class="detail-cell"><span class="detail-label">Feasible</span>${candidates.feasible_candidates ?? 0} / ${candidates.total_candidates ?? 0}</div>
+          <div class="detail-cell"><span class="detail-label">Fragmentation</span>${after.fragmentation_index != null ? Math.round(after.fragmentation_index * 100) + "%" : "-"}</div>
+          <div class="detail-cell"><span class="detail-label">Largest Free Rect</span>${largest.area ? `${largest.w}x${largest.h} (${largest.area})` : "-"}</div>
+        </div>
+        <div class="detail-cell"><span class="detail-label">Score Breakdown</span>
+          Wasted ${score.wasted_cells ?? "-"} / Frag ${score.fragmentation_penalty ?? "-"} / Route ${score.route_proximity_penalty ?? "-"} / Priority ${score.priority_penalty ?? "-"} / Delay ${score.delay_penalty ?? "-"} / Overflow ${score.overflow_penalty ?? "-"}
+        </div>
+        <div class="detail-cell"><span class="detail-label">Constraint Violations</span>
+          Boundary ${violations.boundary ?? 0} / Overlap ${violations.overlap ?? 0} / Obstacle ${violations.obstacle ?? 0} / Clearance ${violations.clearance ?? 0}
+        </div>
+        <div class="analyzer-note">${placement.placement_reason || "Selected slot is highlighted on the 2D board."}</div>
+      `;
+    }
+
+    function render3DViewer() {
+      renderCanvas3DViewer();
+    }
+
+    function renderCanvas3DViewer() {
+      if (!viewer3dScene) return;
+      viewer3dScene.classList.add("webgl");
+      let canvas = viewer3dScene.querySelector("canvas.viewer3d-canvas");
+      if (!canvas) {
+        canvas = document.createElement("canvas");
+        canvas.className = "viewer3d-canvas";
+        viewer3dScene.insertBefore(canvas, viewer3dScene.firstChild);
+      }
+
+      const rect = viewer3dScene.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const width = Math.max(1, Math.floor(rect.width));
+      const height = Math.max(1, Math.floor(rect.height));
+      if (canvas.width !== Math.floor(width * dpr) || canvas.height !== Math.floor(height * dpr)) {
+        canvas.width = Math.floor(width * dpr);
+        canvas.height = Math.floor(height * dpr);
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+      }
+
+      if (renderWebGLPlacementViewer(canvas, width, height, dpr)) {
+        return;
+      }
+
+      const ctx = canvas.getContext("2d");
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      drawCanvasBackground(ctx, width, height);
+
+      drawCanvasIsoView(ctx, width, height);
+    }
+
+    function renderWebGLPlacementViewer(canvas, width, height, dpr) {
+      const gl = canvas._placementGl || canvas.getContext("webgl", { antialias: true, alpha: false });
+      if (!gl) return false;
+      canvas._placementGl = gl;
+      const resources = canvas._placementResources || initPlacementWebGL(gl);
+      if (!resources) return false;
+      canvas._placementResources = resources;
+
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.enable(gl.DEPTH_TEST);
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      gl.clearColor(0.01, 0.04, 0.08, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+      const aspect = width / Math.max(1, height);
+      const projection = mat4Perspective(degToRad(43), aspect, 0.1, 100);
+      const view = mat4LookAt([0, 10.8, 18.4], [0, 0, 0.55], [0, 1, 0]);
+      const viewProjection = mat4Multiply(projection, view);
+      const boardWorld = getWebGLBoardLayout();
+
+      usePlacementProgram(gl, resources);
+      drawWebGLFloor(gl, resources, viewProjection);
+      drawWebGLRoutes(gl, resources, boardWorld, viewProjection);
+
+      MODULE_ORDER.forEach((moduleName) => {
+        const board = boardWorld[moduleName];
+        drawWebGLBoard(gl, resources, board, viewProjection);
+        if (showCandidateOverlay && activePlacement?.module === moduleName && activePlacement.placement?.assigned_rect) {
+          const context = activePlacement.scheduleContext || activePlacement.placement.schedule_context || {};
+          if (context.planned_cell) {
+            drawWebGLSlot(gl, resources, board, {
+              x: context.planned_cell.x,
+              y: context.planned_cell.y,
+              w: activePlacement.placement.assigned_rect.w,
+              h: activePlacement.placement.assigned_rect.h
+            }, viewProjection, true);
+          }
+          drawWebGLSlot(gl, resources, board, activePlacement.placement.assigned_rect, viewProjection, false);
+        }
+        Object.values(blocks)
+          .filter((block) => block.module === moduleName && !block.moving && block.status !== "moving")
+          .forEach((block) => drawWebGLBlock(gl, resources, board, block, viewProjection));
+      });
+      Object.values(transporters).forEach((tr, index) => drawWebGLTransporter(gl, resources, boardWorld, tr, index, viewProjection));
+
+      updateWebGLHud();
+      return true;
+    }
+
+    function initPlacementWebGL(gl) {
+      const vertexSource = `
+        attribute vec3 a_position;
+        attribute vec3 a_normal;
+        uniform mat4 u_mvp;
+        uniform mat4 u_model;
+        varying vec3 v_normal;
+        varying vec3 v_world;
+        void main() {
+          vec4 world = u_model * vec4(a_position, 1.0);
+          v_world = world.xyz;
+          v_normal = a_normal;
+          gl_Position = u_mvp * vec4(a_position, 1.0);
+        }
+      `;
+      const fragmentSource = `
+        precision mediump float;
+        uniform vec4 u_color;
+        uniform vec3 u_light;
+        uniform float u_emissive;
+        varying vec3 v_normal;
+        varying vec3 v_world;
+        void main() {
+          vec3 normal = normalize(v_normal);
+          float diffuse = max(dot(normal, normalize(u_light)), 0.0);
+          float rim = pow(1.0 - max(abs(normal.y), 0.0), 2.0) * 0.18;
+          float light = 0.34 + diffuse * 0.58 + rim + u_emissive;
+          gl_FragColor = vec4(u_color.rgb * light, u_color.a);
+        }
+      `;
+      const program = createWebGLProgram(gl, vertexSource, fragmentSource);
+      if (!program) return null;
+      const cube = createCubeMesh();
+      const cubePosition = createArrayBuffer(gl, new Float32Array(cube.positions));
+      const cubeNormal = createArrayBuffer(gl, new Float32Array(cube.normals));
+      return {
+        program,
+        attrs: {
+          position: gl.getAttribLocation(program, "a_position"),
+          normal: gl.getAttribLocation(program, "a_normal")
+        },
+        uniforms: {
+          mvp: gl.getUniformLocation(program, "u_mvp"),
+          model: gl.getUniformLocation(program, "u_model"),
+          color: gl.getUniformLocation(program, "u_color"),
+          light: gl.getUniformLocation(program, "u_light"),
+          emissive: gl.getUniformLocation(program, "u_emissive")
+        },
+        cubePosition,
+        cubeNormal,
+        cubeCount: cube.positions.length / 3
+      };
+    }
+
+    function usePlacementProgram(gl, resources) {
+      gl.useProgram(resources.program);
+      gl.bindBuffer(gl.ARRAY_BUFFER, resources.cubePosition);
+      gl.enableVertexAttribArray(resources.attrs.position);
+      gl.vertexAttribPointer(resources.attrs.position, 3, gl.FLOAT, false, 0, 0);
+      gl.bindBuffer(gl.ARRAY_BUFFER, resources.cubeNormal);
+      gl.enableVertexAttribArray(resources.attrs.normal);
+      gl.vertexAttribPointer(resources.attrs.normal, 3, gl.FLOAT, false, 0, 0);
+      gl.uniform3fv(resources.uniforms.light, new Float32Array([-0.45, 0.9, 0.35]));
+    }
+
+    function getWebGLBoardLayout() {
+      const centers = [-10.5, -3.5, 3.5, 10.5];
+      const boardW = 5.8;
+      const boardD = 4.45;
+      const layout = {};
+      MODULE_ORDER.forEach((moduleName, index) => {
+        layout[moduleName] = {
+          name: moduleName,
+          x: centers[index],
+          z: 0,
+          w: boardW,
+          d: boardD,
+          cols: MODULE_META[moduleName].cols,
+          rows: MODULE_META[moduleName].rows
+        };
+      });
+      return layout;
+    }
+
+    function drawWebGLFloor(gl, resources, viewProjection) {
+      drawWebGLCube(gl, resources, viewProjection, [0, -0.08, 0.6], [32, 0.05, 8.0], [0.025, 0.07, 0.12, 1], 0);
+    }
+
+    function drawWebGLRoutes(gl, resources, boards, viewProjection) {
+      [["Soji", "Painting"], ["Painting", "Storage"], ["Storage", "PE"]].forEach(([fromName, toName]) => {
+        const from = boards[fromName];
+        const to = boards[toName];
+        const x = (from.x + to.x) / 2;
+        const active = activeRoute === `${fromName}-${toName}`;
+        drawWebGLCube(gl, resources, viewProjection, [x, 0.08, from.z - from.d / 2 - 0.55], [1.35, 0.04, 0.05], active ? [1.0, 0.75, 0.23, 1] : [0.95, 0.64, 0.25, 0.55], active ? 0.55 : 0.18);
+        drawWebGLCube(gl, resources, viewProjection, [x + 0.72, 0.08, from.z - from.d / 2 - 0.55], [0.16, 0.05, 0.18], [1.0, 0.76, 0.33, 0.9], 0.35);
+      });
+    }
+
+    function drawWebGLBoard(gl, resources, board, viewProjection) {
+      drawWebGLCube(gl, resources, viewProjection, [board.x, -0.12, board.z], [board.w, 0.24, board.d], [0.08, 0.18, 0.29, 1], 0);
+      drawWebGLCube(gl, resources, viewProjection, [board.x, 0.03, board.z], [board.w * 0.96, 0.06, board.d * 0.92], [0.10, 0.27, 0.42, 1], 0.02);
+      for (let i = 0; i <= board.cols; i += 1) {
+        const x = board.x - board.w / 2 + i * (board.w / board.cols);
+        drawWebGLCube(gl, resources, viewProjection, [x, 0.08, board.z], [0.012, 0.012, board.d * 0.92], [0.42, 0.68, 0.95, 0.42], 0.15);
+      }
+      for (let i = 0; i <= board.rows; i += 1) {
+        const z = board.z - board.d / 2 + i * (board.d / board.rows);
+        drawWebGLCube(gl, resources, viewProjection, [board.x, 0.085, z], [board.w * 0.96, 0.012, 0.012], [0.42, 0.68, 0.95, 0.42], 0.15);
+      }
+      for (let i = 0; i < 10; i += 1) {
+        const x = board.x - board.w / 2 + 0.35 + i * ((board.w - 0.7) / 9);
+        drawWebGLCube(gl, resources, viewProjection, [x, 0.12, board.z + board.d / 2 + 0.15], [0.08, 0.08, 0.08], [1.0, 0.62, 0.18, 1], 0.5);
+      }
+    }
+
+    function drawWebGLSlot(gl, resources, board, rect, viewProjection, planned) {
+      const cellW = board.w / board.cols;
+      const cellD = board.d / board.rows;
+      const w = (rect.w || rect.cols || 1) * cellW;
+      const d = (rect.h || rect.rows || 1) * cellD;
+      const x = board.x - board.w / 2 + (rect.x || 0) * cellW + w / 2;
+      const z = board.z - board.d / 2 + (rect.y || 0) * cellD + d / 2;
+      drawWebGLCube(gl, resources, viewProjection, [x, 0.16, z], [w * 0.98, 0.035, d * 0.98], planned ? [0.85, 0.9, 1.0, 0.35] : [1.0, 0.78, 0.18, 0.78], planned ? 0.05 : 0.42);
+    }
+
+    function drawWebGLBlock(gl, resources, board, block, viewProjection) {
+      const cellW = board.w / board.cols;
+      const cellD = board.d / board.rows;
+      const w = Math.max(0.15, block.w * cellW * 0.94);
+      const d = Math.max(0.15, block.h * cellD * 0.94);
+      const h = Math.max(0.42, Math.min(1.35, get3DHeight(block) / 30));
+      const x = board.x - board.w / 2 + block.x * cellW + block.w * cellW / 2;
+      const z = board.z - board.d / 2 + block.y * cellD + block.h * cellD / 2;
+      const isActive = activePlacement?.blockId === block.id && activePlacement?.module === block.module;
+      if (isActive) {
+        drawWebGLCube(gl, resources, viewProjection, [x, 0.18, z], [w + 0.22, 0.04, d + 0.22], [1.0, 0.78, 0.20, 0.72], 0.45);
+      }
+      drawWebGLCube(gl, resources, viewProjection, [x, 0.2 + h / 2, z], [w, h, d], rgbaFromHex(getBlockTypeColor(block.type, block.status), 1), isActive ? 0.12 : 0.02);
+    }
+
+    function drawWebGLTransporter(gl, resources, boards, tr, index, viewProjection) {
+      const pose = getWebGLTransporterPose(boards, tr, index);
+      if (!pose) return;
+      const cargoBlockId = tr.loadedBlockId || (simTime <= (tr.visualLoadedUntil || -1) ? tr.visualLoadedBlockId : null);
+      const vehicleColor = cargoBlockId ? [0.98, 0.64, 0.18, 1] : [0.62, 0.72, 0.82, 1];
+      drawWebGLCube(gl, resources, viewProjection, [pose.x, 0.34, pose.z], [0.58, 0.22, 0.32], vehicleColor, cargoBlockId ? 0.28 : 0.04);
+      drawWebGLCube(gl, resources, viewProjection, [pose.x - 0.20, 0.18, pose.z + 0.18], [0.14, 0.12, 0.12], [0.03, 0.05, 0.08, 1], 0);
+      drawWebGLCube(gl, resources, viewProjection, [pose.x + 0.20, 0.18, pose.z + 0.18], [0.14, 0.12, 0.12], [0.03, 0.05, 0.08, 1], 0);
+      drawWebGLCube(gl, resources, viewProjection, [pose.x - 0.20, 0.18, pose.z - 0.18], [0.14, 0.12, 0.12], [0.03, 0.05, 0.08, 1], 0);
+      drawWebGLCube(gl, resources, viewProjection, [pose.x + 0.20, 0.18, pose.z - 0.18], [0.14, 0.12, 0.12], [0.03, 0.05, 0.08, 1], 0);
+      if (cargoBlockId) {
+        const block = blocks[cargoBlockId];
+        drawWebGLCube(gl, resources, viewProjection, [pose.x, 0.62, pose.z], [0.42, 0.28, 0.26], rgbaFromHex(block?.color || getBlockTypeColor(block?.type, "moving"), 1), 0.14);
+      }
+    }
+
+    function getWebGLTransporterPose(boards, tr, index) {
+      if (tr.activeMove && simTime <= tr.activeMove.end) {
+        const progress = Math.max(0, Math.min(1, (simTime - tr.activeMove.start) / (tr.activeMove.end - tr.activeMove.start)));
+        const from = boards[normalizeModule(tr.activeMove.from)];
+        const to = boards[normalizeModule(tr.activeMove.to)];
+        if (from && to) {
+          const fromX = from.x + from.w / 2 + 0.42;
+          const toX = to.x - to.w / 2 - 0.42;
+          const routeZ = from.z - from.d / 2 - 0.58 - (index % 2) * 0.22;
+          return {
+            x: lerp(fromX, toX, ease(progress)),
+            z: routeZ + Math.sin(progress * Math.PI) * 0.08
+          };
+        }
+      }
+      const names = MODULE_ORDER;
+      const board = boards[normalizeModule(tr.current_location)] || boards[names[index % names.length]];
+      if (!board) return null;
+      return {
+        x: board.x - board.w / 2 + 0.6 + (index % 3) * 0.46,
+        z: board.z + board.d / 2 + 0.52 + Math.floor(index / 3) * 0.26
+      };
+    }
+
+    function drawWebGLCube(gl, resources, viewProjection, translation, scale, color, emissive = 0) {
+      const model = mat4FromTranslationScale(translation, scale);
+      const mvp = mat4Multiply(viewProjection, model);
+      gl.uniformMatrix4fv(resources.uniforms.model, false, new Float32Array(model));
+      gl.uniformMatrix4fv(resources.uniforms.mvp, false, new Float32Array(mvp));
+      gl.uniform4fv(resources.uniforms.color, new Float32Array(color));
+      gl.uniform1f(resources.uniforms.emissive, emissive);
+      gl.drawArrays(gl.TRIANGLES, 0, resources.cubeCount);
+    }
+
+    function updateWebGLHud() {
+      if (!webglPlacementHud) return;
+      const placement = activePlacement?.placement;
+      if (!placement) {
+        webglPlacementHud.innerHTML = `
+          <div class="hud-head"><span>Active Placement Decision</span><span class="hud-chip">READY</span></div>
+          <div class="hud-title">Waiting for event</div>
+          <div class="hud-row"><span>JSON playback</span><strong>running</strong></div>
+        `;
+        return;
+      }
+      const rect = placement.assigned_rect || {};
+      const score = placement.score?.total ?? placement.placement_score ?? placement.total_score;
+      const feasible = placement.candidate_summary?.feasible_candidates ?? "-";
+      const total = placement.candidate_summary?.total_candidates ?? "-";
+      const block = activePlacement.block || blocks[activePlacement.blockId] || {};
+      webglPlacementHud.innerHTML = `
+        <div class="hud-head"><span>Active Placement Decision</span><span class="hud-chip">${placement.status || "assigned"}</span></div>
+        <div class="hud-title">${activePlacement.blockId || "-"} / ${activePlacement.module || "-"}</div>
+        <div class="hud-row"><span>Block Type</span><strong>${formatBlockType(block.type)} | P${block.priority || "-"}</strong></div>
+        <div class="hud-row"><span>Slot</span><strong>x${rect.x ?? "-"}, y${rect.y ?? "-"} | ${rect.w || block.w || "-"}x${rect.h || block.h || "-"}</strong></div>
+        <div class="hud-row"><span>Score</span><strong>${formatNumber(score)}</strong></div>
+        <div class="hud-row"><span>Feasible</span><strong>${feasible}/${total}</strong></div>
+      `;
+    }
+
+    function createWebGLProgram(gl, vertexSource, fragmentSource) {
+      const vertex = compileShader(gl, gl.VERTEX_SHADER, vertexSource);
+      const fragment = compileShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
+      if (!vertex || !fragment) return null;
+      const program = gl.createProgram();
+      gl.attachShader(program, vertex);
+      gl.attachShader(program, fragment);
+      gl.linkProgram(program);
+      return gl.getProgramParameter(program, gl.LINK_STATUS) ? program : null;
+    }
+
+    function compileShader(gl, type, source) {
+      const shader = gl.createShader(type);
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+      return gl.getShaderParameter(shader, gl.COMPILE_STATUS) ? shader : null;
+    }
+
+    function createArrayBuffer(gl, data) {
+      const buffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+      gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+      return buffer;
+    }
+
+    function createCubeMesh() {
+      const faces = [
+        [[-0.5,-0.5,0.5],[0.5,-0.5,0.5],[0.5,0.5,0.5],[-0.5,0.5,0.5],[0,0,1]],
+        [[0.5,-0.5,-0.5],[-0.5,-0.5,-0.5],[-0.5,0.5,-0.5],[0.5,0.5,-0.5],[0,0,-1]],
+        [[-0.5,0.5,0.5],[0.5,0.5,0.5],[0.5,0.5,-0.5],[-0.5,0.5,-0.5],[0,1,0]],
+        [[-0.5,-0.5,-0.5],[0.5,-0.5,-0.5],[0.5,-0.5,0.5],[-0.5,-0.5,0.5],[0,-1,0]],
+        [[0.5,-0.5,0.5],[0.5,-0.5,-0.5],[0.5,0.5,-0.5],[0.5,0.5,0.5],[1,0,0]],
+        [[-0.5,-0.5,-0.5],[-0.5,-0.5,0.5],[-0.5,0.5,0.5],[-0.5,0.5,-0.5],[-1,0,0]]
+      ];
+      const positions = [];
+      const normals = [];
+      faces.forEach((face) => {
+        const [a, b, c, d, n] = face;
+        [a, b, c, a, c, d].forEach((point) => {
+          positions.push(point[0], point[1], point[2]);
+          normals.push(n[0], n[1], n[2]);
+        });
+      });
+      return { positions, normals };
+    }
+
+    function rgbaFromHex(hex, alpha = 1) {
+      const clean = String(hex || "#8795a5").replace("#", "");
+      const value = parseInt(clean.length === 3 ? clean.split("").map((c) => c + c).join("") : clean, 16);
+      return [((value >> 16) & 255) / 255, ((value >> 8) & 255) / 255, (value & 255) / 255, alpha];
+    }
+
+    function degToRad(value) { return value * Math.PI / 180; }
+
+    function mat4FromTranslationScale(t, s) {
+      return [
+        s[0], 0, 0, 0,
+        0, s[1], 0, 0,
+        0, 0, s[2], 0,
+        t[0], t[1], t[2], 1
+      ];
+    }
+
+    function mat4Perspective(fovy, aspect, near, far) {
+      const f = 1 / Math.tan(fovy / 2);
+      const nf = 1 / (near - far);
+      return [
+        f / aspect, 0, 0, 0,
+        0, f, 0, 0,
+        0, 0, (far + near) * nf, -1,
+        0, 0, (2 * far * near) * nf, 0
+      ];
+    }
+
+    function mat4LookAt(eye, center, up) {
+      const z = normalize3([eye[0] - center[0], eye[1] - center[1], eye[2] - center[2]]);
+      const x = normalize3(cross3(up, z));
+      const y = cross3(z, x);
+      return [
+        x[0], y[0], z[0], 0,
+        x[1], y[1], z[1], 0,
+        x[2], y[2], z[2], 0,
+        -dot3(x, eye), -dot3(y, eye), -dot3(z, eye), 1
+      ];
+    }
+
+    function mat4Multiply(a, b) {
+      const out = new Array(16).fill(0);
+      for (let col = 0; col < 4; col += 1) {
+        for (let row = 0; row < 4; row += 1) {
+          out[col * 4 + row] =
+            a[0 * 4 + row] * b[col * 4 + 0] +
+            a[1 * 4 + row] * b[col * 4 + 1] +
+            a[2 * 4 + row] * b[col * 4 + 2] +
+            a[3 * 4 + row] * b[col * 4 + 3];
+        }
+      }
+      return out;
+    }
+
+    function normalize3(v) {
+      const len = Math.hypot(v[0], v[1], v[2]) || 1;
+      return [v[0] / len, v[1] / len, v[2] / len];
+    }
+
+    function cross3(a, b) {
+      return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+    }
+
+    function dot3(a, b) {
+      return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    }
+
+    function drawCanvasBackground(ctx, width, height) {
+      const gradient = ctx.createLinearGradient(0, 0, 0, height);
+      gradient.addColorStop(0, "#06162a");
+      gradient.addColorStop(0.55, "#031126");
+      gradient.addColorStop(1, "#010711");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, width, height);
+      ctx.save();
+      ctx.strokeStyle = "rgba(103, 174, 255, 0.055)";
+      ctx.lineWidth = 1;
+      for (let x = 36; x < width; x += 42) line(ctx, x, 0, x, height);
+      for (let y = 34; y < height; y += 42) line(ctx, 0, y, width, y);
+      ctx.strokeStyle = "rgba(103, 174, 255, 0.11)";
+      for (let x = 36; x < width; x += 210) line(ctx, x, 0, x, height);
+      for (let y = 34; y < height; y += 168) line(ctx, 0, y, width, y);
+      drawBlueprintShip(ctx, width * 0.5, 120, Math.min(720, width * 0.46), 96);
+      ctx.restore();
+    }
+
+    function drawBlueprintShip(ctx, cx, y, w, h) {
+      ctx.save();
+      ctx.strokeStyle = "rgba(73, 156, 242, 0.12)";
+      ctx.lineWidth = 1;
+      const left = cx - w / 2;
+      const right = cx + w / 2;
+      const deckY = y + h * 0.54;
+      ctx.beginPath();
+      ctx.moveTo(left, deckY);
+      ctx.lineTo(left + w * 0.10, y + h * 0.32);
+      ctx.lineTo(left + w * 0.64, y + h * 0.32);
+      ctx.lineTo(right - w * 0.06, y + h * 0.46);
+      ctx.lineTo(right, deckY);
+      ctx.lineTo(right - w * 0.12, y + h * 0.72);
+      ctx.lineTo(left + w * 0.14, y + h * 0.72);
+      ctx.closePath();
+      ctx.stroke();
+      line(ctx, left + w * 0.16, deckY, right - w * 0.12, deckY);
+      ctx.strokeRect(left + w * 0.36, y + h * 0.12, w * 0.18, h * 0.20);
+      ctx.strokeRect(left + w * 0.43, y - h * 0.02, w * 0.10, h * 0.14);
+      for (let i = 0; i < 8; i += 1) {
+        const x = left + w * (0.18 + i * 0.075);
+        line(ctx, x, y + h * 0.35, x, y + h * 0.68);
+      }
+      ctx.fillStyle = "rgba(73, 156, 242, 0.10)";
+      ctx.font = "700 10px sans-serif";
+      ctx.fillText("SHIPYARD BLOCK LAYOUT REPLAY", left + 8, y + h + 18);
+      ctx.restore();
+    }
+
+    function drawCanvasIsoView(ctx, width, height) {
+      const marginX = 42;
+      const gap = 34;
+      const availableW = width - marginX * 2 - gap * 3;
+      const boardW = Math.min(360, availableW / 4);
+      const boardH = boardW * 0.82;
+      const boardY = Math.max(245, height * 0.43);
+      const boardPositions = {
+        Soji: { x: marginX, y: boardY, w: boardW, h: boardH },
+        Painting: { x: marginX + (boardW + gap), y: boardY, w: boardW, h: boardH },
+        Storage: { x: marginX + (boardW + gap) * 2, y: boardY, w: boardW, h: boardH },
+        PE: { x: marginX + (boardW + gap) * 3, y: boardY, w: boardW, h: boardH }
+      };
+      const boardInfo = {};
+
+      MODULE_ORDER.forEach((moduleName) => {
+        const meta = MODULE_META[moduleName];
+        const pos = boardPositions[moduleName];
+        boardInfo[moduleName] = { meta, pos };
+      });
+
+      drawOrthoRoute(ctx, boardInfo.Soji, boardInfo.Painting, "Soji to Painting");
+      drawOrthoRoute(ctx, boardInfo.Painting, boardInfo.Storage, "Painting to Storage");
+      drawOrthoRoute(ctx, boardInfo.Storage, boardInfo.PE, "Storage to PE");
+
+      MODULE_ORDER.forEach((moduleName) => {
+        const { meta, pos } = boardInfo[moduleName];
+        const cellW = pos.w / meta.cols;
+        const cellH = pos.h / meta.rows;
+        drawOrthoBoard(ctx, moduleName, meta, pos);
+        if (showCandidateOverlay && activePlacement?.module === moduleName && activePlacement.placement?.assigned_rect) {
+          const context = activePlacement.scheduleContext || activePlacement.placement.schedule_context || {};
+          if (context.planned_cell) {
+            drawOrthoSlot(ctx, {
+              x: context.planned_cell.x,
+              y: context.planned_cell.y,
+              w: activePlacement.placement.assigned_rect.w,
+              h: activePlacement.placement.assigned_rect.h
+            }, pos, cellW, cellH, true);
+          }
+          drawOrthoSlot(ctx, activePlacement.placement.assigned_rect, pos, cellW, cellH, false);
+        }
+        Object.values(blocks)
+          .filter((block) => block.module === moduleName && !block.moving && block.status !== "moving")
+          .sort((a, b) => (a.y + a.h) - (b.y + b.h) || a.x - b.x)
+          .forEach((block) => drawOrthoBlock(ctx, block, pos, cellW, cellH));
+      });
+      drawViewerHud(ctx, width, height);
+    }
+
+    function drawOrthoBoard(ctx, moduleName, meta, pos) {
+      const depth = Math.max(28, pos.w * 0.10);
+      const bevel = 14;
+      const top = [
+        { x: pos.x + bevel, y: pos.y },
+        { x: pos.x + pos.w, y: pos.y },
+        { x: pos.x + pos.w, y: pos.y + pos.h - bevel },
+        { x: pos.x + pos.w - bevel, y: pos.y + pos.h },
+        { x: pos.x, y: pos.y + pos.h },
+        { x: pos.x, y: pos.y + bevel }
+      ];
+      const front = [
+        { x: pos.x, y: pos.y + pos.h },
+        { x: pos.x + pos.w - bevel, y: pos.y + pos.h },
+        { x: pos.x + pos.w - bevel + depth, y: pos.y + pos.h + depth },
+        { x: pos.x + depth * 0.35, y: pos.y + pos.h + depth }
+      ];
+      const right = [
+        { x: pos.x + pos.w, y: pos.y },
+        { x: pos.x + pos.w + depth, y: pos.y + depth },
+        { x: pos.x + pos.w - bevel + depth, y: pos.y + pos.h + depth },
+        { x: pos.x + pos.w - bevel, y: pos.y + pos.h },
+        { x: pos.x + pos.w, y: pos.y + pos.h - bevel }
+      ];
+
+      ctx.save();
+      ctx.shadowColor = "rgba(0, 0, 0, 0.55)";
+      ctx.shadowBlur = 24;
+      ctx.shadowOffsetY = 20;
+      polygon(ctx, front, "rgba(7, 17, 30, 0.78)", "rgba(70, 129, 195, 0.22)", 1);
+      ctx.restore();
+      polygon(ctx, right, "rgba(8, 22, 39, 0.88)", "rgba(70, 129, 195, 0.28)", 1);
+      polygon(ctx, front, "rgba(8, 20, 35, 0.92)", "rgba(70, 129, 195, 0.30)", 1);
+      polygon(ctx, top, "rgba(15, 39, 64, 0.95)", "rgba(128, 190, 255, 0.58)", 1.4);
+
+      const surfaceGradient = ctx.createLinearGradient(pos.x, pos.y, pos.x + pos.w, pos.y + pos.h);
+      surfaceGradient.addColorStop(0, "rgba(184, 218, 255, 0.05)");
+      surfaceGradient.addColorStop(1, "rgba(16, 45, 74, 0.12)");
+      polygon(ctx, top, surfaceGradient, "rgba(128, 190, 255, 0.30)", 1);
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(top[0].x, top[0].y);
+      top.slice(1).forEach((point) => ctx.lineTo(point.x, point.y));
+      ctx.closePath();
+      ctx.clip();
+      ctx.strokeStyle = "rgba(154, 204, 255, 0.22)";
+      ctx.lineWidth = 1;
+      const cellW = pos.w / meta.cols;
+      const cellH = pos.h / meta.rows;
+      for (let x = 1; x < meta.cols; x += 1) line(ctx, pos.x + x * cellW, pos.y, pos.x + x * cellW, pos.y + pos.h);
+      for (let y = 1; y < meta.rows; y += 1) line(ctx, pos.x, pos.y + y * cellH, pos.x + pos.w, pos.y + y * cellH);
+      ctx.restore();
+
+      drawPlatformRails(ctx, pos, depth);
+      drawPlatformLights(ctx, pos, depth);
+      drawCanvasLabel(ctx, moduleName, pos.x + 22, pos.y - 42, {
+        fill: "rgba(5, 17, 33, 0.92)",
+        stroke: "rgba(96, 165, 250, 0.58)",
+        text: "#dceaff"
+      });
+    }
+
+    function drawPlatformRails(ctx, pos, depth) {
+      ctx.save();
+      ctx.strokeStyle = "rgba(178, 211, 246, 0.28)";
+      ctx.lineWidth = 2;
+      line(ctx, pos.x + 8, pos.y + 10, pos.x + pos.w - 8, pos.y + 10);
+      line(ctx, pos.x + 10, pos.y + pos.h - 8, pos.x + pos.w - 18, pos.y + pos.h - 8);
+      line(ctx, pos.x + 10, pos.y + pos.h + depth - 9, pos.x + pos.w + depth - 24, pos.y + pos.h + depth - 9);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = "rgba(178, 211, 246, 0.20)";
+      for (let x = pos.x + 16; x < pos.x + pos.w; x += 24) {
+        line(ctx, x, pos.y + pos.h - 8, x + depth * 0.35, pos.y + pos.h + depth - 9);
+      }
+      ctx.restore();
+    }
+
+    function drawPlatformLights(ctx, pos, depth) {
+      ctx.save();
+      for (let i = 0; i < 9; i += 1) {
+        const t = i / 8;
+        const x = pos.x + 18 + t * (pos.w - 46) + depth * 0.26;
+        const y = pos.y + pos.h + depth - 11;
+        ctx.fillStyle = "rgba(255, 181, 69, 0.95)";
+        ctx.shadowColor = "rgba(255, 181, 69, 0.85)";
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.arc(x, y, 2.1, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    function drawBlockDetails(ctx, x, y, w, h) {
+      ctx.save();
+      ctx.strokeStyle = "rgba(255,255,255,0.12)";
+      ctx.lineWidth = 1;
+      const inset = Math.min(10, Math.max(5, w * 0.08));
+      ctx.strokeRect(x + inset, y + inset, Math.max(8, w - inset * 2), Math.max(8, h - inset * 2));
+      for (let i = 0; i < 3; i += 1) {
+        const px = x + inset + i * Math.max(9, (w - inset * 2) / 2);
+        const py = y + h - inset;
+        ctx.fillStyle = "rgba(0,0,0,0.22)";
+        ctx.fillRect(px - 2, py - 2, 4, 4);
+      }
+      ctx.restore();
+    }
+
+    function drawOrthoBlock(ctx, block, pos, cellW, cellH) {
+      const x = pos.x + block.x * cellW + 2;
+      const y = pos.y + block.y * cellH + 2;
+      const w = block.w * cellW - 4;
+      const h = block.h * cellH - 4;
+      const depth = Math.max(12, Math.min(28, get3DHeight(block) / 1.8));
+      const color = getBlockTypeColor(block.type, block.status);
+      const isActive = activePlacement?.blockId === block.id && activePlacement?.module === block.module;
+
+      if (isActive) {
+        ctx.save();
+        ctx.shadowColor = "rgba(246, 211, 107, 0.68)";
+        ctx.shadowBlur = 16;
+        ctx.strokeStyle = "#f6d36b";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x - 5, y - 5, w + 10, h + 10);
+        ctx.restore();
+      }
+
+      ctx.fillStyle = "rgba(0, 0, 0, 0.30)";
+      ctx.fillRect(x + depth * 0.55, y + depth * 0.65, w, h);
+      polygon(ctx, [
+        { x: x + w, y },
+        { x: x + w + depth * 0.55, y: y + depth * 0.55 },
+        { x: x + w + depth * 0.55, y: y + h + depth * 0.55 },
+        { x: x + w, y: y + h }
+      ], shadeColor(color, -28), "rgba(0,0,0,0.22)", 0.8);
+      polygon(ctx, [
+        { x, y: y + h },
+        { x: x + depth * 0.55, y: y + h + depth * 0.55 },
+        { x: x + w + depth * 0.55, y: y + h + depth * 0.55 },
+        { x: x + w, y: y + h }
+      ], shadeColor(color, -36), "rgba(0,0,0,0.22)", 0.8);
+      const topGradient = ctx.createLinearGradient(x, y, x + w, y + h);
+      topGradient.addColorStop(0, shadeColor(color, 28));
+      topGradient.addColorStop(1, shadeColor(color, -2));
+      ctx.fillStyle = topGradient;
+      ctx.strokeStyle = isActive ? "#f6d36b" : block.scheduleContext?.is_delayed ? "#ff7777" : "rgba(255,255,255,0.58)";
+      ctx.lineWidth = isActive ? 2.1 : 1.2;
+      ctx.fillRect(x, y, w, h);
+      ctx.strokeRect(x, y, w, h);
+      drawBlockDetails(ctx, x, y, w, h);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "800 12px sans-serif";
+      ctx.fillText(block.id, x + Math.max(8, w * 0.12), y + Math.max(18, h * 0.28));
+    }
+
+    function drawOrthoSlot(ctx, rect, pos, cellW, cellH, planned) {
+      const x = pos.x + rect.x * cellW;
+      const y = pos.y + rect.y * cellH;
+      const w = (rect.w || rect.cols || 1) * cellW;
+      const h = (rect.h || rect.rows || 1) * cellH;
+      ctx.save();
+      ctx.fillStyle = planned ? "rgba(255,255,255,0.06)" : "rgba(246,211,107,0.18)";
+      ctx.strokeStyle = planned ? "rgba(255,255,255,0.72)" : "#f6d36b";
+      ctx.lineWidth = planned ? 1.4 : 2.4;
+      ctx.setLineDash(planned ? [6, 4] : []);
+      ctx.fillRect(x, y, w, h);
+      ctx.strokeRect(x, y, w, h);
+      ctx.restore();
+      if (!planned) {
+        drawCanvasLabel(ctx, `SELECTED x${rect.x}, y${rect.y}`, x + 8, Math.max(8, y - 32), {
+          fill: "rgba(38, 29, 8, 0.92)",
+          stroke: "rgba(246, 211, 107, 0.85)",
+          text: "#fff4c4"
+        });
+        ctx.save();
+        ctx.strokeStyle = "rgba(246, 211, 107, 0.72)";
+        ctx.lineWidth = 1.2;
+        line(ctx, x + w * 0.5, y, x + 8, Math.max(12, y - 12));
+        ctx.restore();
+      }
+    }
+
+    function drawOrthoRoute(ctx, from, to, label) {
+      if (!from || !to) return;
+      const start = { x: from.pos.x + from.pos.w + 10, y: from.pos.y + from.pos.h / 2 };
+      const end = { x: to.pos.x - 10, y: to.pos.y + to.pos.h / 2 };
+      ctx.save();
+      ctx.strokeStyle = "rgba(239, 180, 90, 0.42)";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([8, 7]);
+      line(ctx, start.x, start.y, end.x, end.y);
+      ctx.setLineDash([]);
+      ctx.fillStyle = "rgba(239, 180, 90, 0.82)";
+      ctx.beginPath();
+      ctx.moveTo(end.x, end.y);
+      ctx.lineTo(end.x - 10, end.y - 5);
+      ctx.lineTo(end.x - 10, end.y + 5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "rgba(180, 210, 245, 0.62)";
+      ctx.font = "600 9px sans-serif";
+      ctx.fillText(label, (start.x + end.x) / 2 - 30, start.y - 8);
+      ctx.restore();
+    }
+
+    function drawCanvasTopView(ctx, width, height) {
+      const marginX = 52;
+      const marginY = 42;
+      const gapX = 44;
+      const gapY = 30;
+      const boardW = (width - marginX * 2 - gapX) / 2;
+      const boardH = (height - marginY * 2 - gapY) / 2;
+      const positions = {
+        Soji: { x: marginX, y: marginY },
+        Painting: { x: marginX + boardW + gapX, y: marginY },
+        Storage: { x: marginX, y: marginY + boardH + gapY },
+        PE: { x: marginX + boardW + gapX, y: marginY + boardH + gapY }
+      };
+      MODULE_ORDER.forEach((moduleName) => {
+        const meta = MODULE_META[moduleName];
+        const pos = positions[moduleName];
+        const cellW = boardW / meta.cols;
+        const cellH = boardH / meta.rows;
+        ctx.fillStyle = "rgba(17, 39, 62, 0.72)";
+        ctx.strokeStyle = "rgba(180, 210, 245, 0.30)";
+        ctx.lineWidth = 1;
+        ctx.fillRect(pos.x, pos.y, boardW, boardH);
+        ctx.strokeRect(pos.x, pos.y, boardW, boardH);
+        ctx.strokeStyle = "rgba(180, 210, 245, 0.17)";
+        for (let x = 1; x < meta.cols; x += 1) line(ctx, pos.x + x * cellW, pos.y, pos.x + x * cellW, pos.y + boardH);
+        for (let y = 1; y < meta.rows; y += 1) line(ctx, pos.x, pos.y + y * cellH, pos.x + boardW, pos.y + y * cellH);
+        ctx.fillStyle = "#dceaff";
+        ctx.font = "700 13px sans-serif";
+        ctx.fillText(moduleName, pos.x, pos.y - 9);
+
+        if (showCandidateOverlay && activePlacement?.module === moduleName && activePlacement.placement?.assigned_rect) {
+          drawTopSlot(ctx, activePlacement.placement.assigned_rect, pos, cellW, cellH, false);
+          const context = activePlacement.scheduleContext || activePlacement.placement.schedule_context || {};
+          if (context.planned_cell) {
+            drawTopSlot(ctx, {
+              x: context.planned_cell.x,
+              y: context.planned_cell.y,
+              w: activePlacement.placement.assigned_rect.w,
+              h: activePlacement.placement.assigned_rect.h
+            }, pos, cellW, cellH, true);
+          }
+        }
+
+        Object.values(blocks)
+          .filter((block) => block.module === moduleName && !block.moving && block.status !== "moving")
+          .forEach((block) => {
+            const x = pos.x + block.x * cellW + 2;
+            const y = pos.y + block.y * cellH + 2;
+            const w = block.w * cellW - 4;
+            const h = block.h * cellH - 4;
+            ctx.fillStyle = getBlockTypeColor(block.type, block.status);
+            ctx.strokeStyle = block.scheduleContext?.is_delayed ? "#ff7777" : "rgba(255,255,255,0.55)";
+            ctx.lineWidth = 1.5;
+            ctx.fillRect(x, y, w, h);
+            ctx.strokeRect(x, y, w, h);
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "700 10px sans-serif";
+            ctx.fillText(block.id, x + 5, y + 13);
+          });
+      });
+    }
+
+    function drawIsoBoard(ctx, moduleName, meta, offset, cell, scale, origin) {
+      const w = meta.cols * cell;
+      const d = meta.rows * cell;
+      const center = projectIso(offset.x + w / 2, -0.04, offset.z + d / 2, scale, origin);
+      ctx.save();
+      const glow = ctx.createRadialGradient(center.x, center.y, 10, center.x, center.y, 135);
+      glow.addColorStop(0, "rgba(83, 159, 241, 0.12)");
+      glow.addColorStop(1, "rgba(83, 159, 241, 0)");
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.ellipse(center.x, center.y + 8, 175, 52, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      const corners = [
+        projectIso(offset.x, 0, offset.z, scale, origin),
+        projectIso(offset.x + w, 0, offset.z, scale, origin),
+        projectIso(offset.x + w, 0, offset.z + d, scale, origin),
+        projectIso(offset.x, 0, offset.z + d, scale, origin)
+      ];
+      polygon(ctx, corners, "rgba(13, 34, 55, 0.90)", "rgba(190, 220, 255, 0.42)", 1.4);
+      ctx.strokeStyle = "rgba(165, 205, 245, 0.24)";
+      ctx.lineWidth = 1;
+      for (let x = 1; x < meta.cols; x += 1) {
+        const a = projectIso(offset.x + x * cell, 0, offset.z, scale, origin);
+        const b = projectIso(offset.x + x * cell, 0, offset.z + d, scale, origin);
+        line(ctx, a.x, a.y, b.x, b.y);
+      }
+      for (let z = 1; z < meta.rows; z += 1) {
+        const a = projectIso(offset.x, 0, offset.z + z * cell, scale, origin);
+        const b = projectIso(offset.x + w, 0, offset.z + z * cell, scale, origin);
+        line(ctx, a.x, a.y, b.x, b.y);
+      }
+      const label = projectIso(offset.x, 0, offset.z - 0.55, scale, origin);
+      drawCanvasLabel(ctx, moduleName, label.x, label.y - 14, {
+        fill: "rgba(7, 18, 32, 0.74)",
+        stroke: "rgba(160, 205, 255, 0.32)",
+        text: "#dceaff"
+      });
+    }
+
+    function drawIsoBlock(ctx, block, offset, cell, scale, origin) {
+      const x = offset.x + block.x * cell;
+      const z = offset.z + block.y * cell;
+      const w = block.w * cell;
+      const d = block.h * cell;
+      const h = Math.max(0.30, get3DHeight(block) / 30);
+      const color = getBlockTypeColor(block.type, block.status);
+      const isActive = activePlacement?.blockId === block.id && activePlacement?.module === block.module;
+      if (isActive) {
+        drawIsoBlockHalo(ctx, x, z, w, d, scale, origin);
+      }
+      const p000 = projectIso(x, 0, z, scale, origin);
+      const p100 = projectIso(x + w, 0, z, scale, origin);
+      const p110 = projectIso(x + w, 0, z + d, scale, origin);
+      const p010 = projectIso(x, 0, z + d, scale, origin);
+      const p001 = projectIso(x, h, z, scale, origin);
+      const p101 = projectIso(x + w, h, z, scale, origin);
+      const p111 = projectIso(x + w, h, z + d, scale, origin);
+      const p011 = projectIso(x, h, z + d, scale, origin);
+      polygon(ctx, [p000, p100, p110, p010], "rgba(0,0,0,0.28)", "rgba(0,0,0,0)", 0);
+      polygon(ctx, [p010, p110, p111, p011], shadeColor(color, -28), "rgba(0,0,0,0.2)", 0.8);
+      polygon(ctx, [p100, p110, p111, p101], shadeColor(color, -15), "rgba(0,0,0,0.18)", 0.8);
+      polygon(ctx, [p001, p101, p111, p011], shadeColor(color, 10), isActive ? "#f6d36b" : block.scheduleContext?.is_delayed ? "#ff7777" : "rgba(255,255,255,0.58)", isActive ? 2.2 : 1.2);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "700 10px sans-serif";
+      ctx.fillText(block.id, p001.x + 4, p001.y + 12);
+    }
+
+    function drawIsoSlot(ctx, rect, offset, cell, scale, origin, planned) {
+      const x = offset.x + rect.x * cell;
+      const z = offset.z + rect.y * cell;
+      const w = (rect.w || rect.cols || 1) * cell;
+      const d = (rect.h || rect.rows || 1) * cell;
+      const corners = [
+        projectIso(x, 0.05, z, scale, origin),
+        projectIso(x + w, 0.05, z, scale, origin),
+        projectIso(x + w, 0.05, z + d, scale, origin),
+        projectIso(x, 0.05, z + d, scale, origin)
+      ];
+      polygon(ctx, corners, planned ? "rgba(255,255,255,0.08)" : "rgba(246,211,107,0.26)", planned ? "rgba(255,255,255,0.72)" : "rgba(246,211,107,0.45)", planned ? 4 : 7, planned ? [5, 4] : []);
+      polygon(ctx, corners, planned ? "rgba(255,255,255,0.04)" : "rgba(246,211,107,0.16)", planned ? "rgba(255,255,255,0.78)" : "#f6d36b", planned ? 1.4 : 2.4, planned ? [5, 4] : []);
+      if (!planned) {
+        drawIsoPlacementGuide(ctx, rect, x, z, w, d, scale, origin);
+      }
+    }
+
+    function drawIsoPlacementGuide(ctx, rect, x, z, w, d, scale, origin) {
+      const base = projectIso(x + w / 2, 0.1, z + d / 2, scale, origin);
+      const top = projectIso(x + w / 2, 1.35, z + d / 2, scale, origin);
+      ctx.save();
+      ctx.strokeStyle = "rgba(246, 211, 107, 0.88)";
+      ctx.lineWidth = 1.4;
+      ctx.setLineDash([4, 3]);
+      line(ctx, base.x, base.y, top.x, top.y);
+      ctx.setLineDash([]);
+      ctx.fillStyle = "#f6d36b";
+      ctx.beginPath();
+      ctx.arc(base.x, base.y, 4, 0, Math.PI * 2);
+      ctx.fill();
+      drawCanvasLabel(ctx, `SELECTED x${rect.x}, y${rect.y}`, top.x + 8, top.y - 12, {
+        fill: "rgba(38, 29, 8, 0.92)",
+        stroke: "rgba(246, 211, 107, 0.85)",
+        text: "#fff4c4"
+      });
+      ctx.restore();
+    }
+
+    function drawIsoBlockHalo(ctx, x, z, w, d, scale, origin) {
+      const pad = 0.10;
+      const corners = [
+        projectIso(x - pad, 0.08, z - pad, scale, origin),
+        projectIso(x + w + pad, 0.08, z - pad, scale, origin),
+        projectIso(x + w + pad, 0.08, z + d + pad, scale, origin),
+        projectIso(x - pad, 0.08, z + d + pad, scale, origin)
+      ];
+      polygon(ctx, corners, "rgba(246,211,107,0.12)", "rgba(246,211,107,0.72)", 2.2);
+    }
+
+    function drawIsoRoute(ctx, from, to, label, scale) {
+      if (!from || !to) return;
+      const a = projectIso(0, 0.02, 0, scale, from.origin);
+      const b = projectIso(0, 0.02, 0, scale, to.origin);
+      const start = { x: lerp(a.x, b.x, 0.23), y: lerp(a.y, b.y, 0.23) };
+      const end = { x: lerp(a.x, b.x, 0.77), y: lerp(a.y, b.y, 0.77) };
+      ctx.save();
+      ctx.strokeStyle = "rgba(239, 180, 90, 0.36)";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([7, 7]);
+      line(ctx, start.x, start.y, end.x, end.y);
+      ctx.setLineDash([]);
+      const angle = Math.atan2(end.y - start.y, end.x - start.x);
+      const arrow = 8;
+      ctx.fillStyle = "rgba(239, 180, 90, 0.68)";
+      ctx.beginPath();
+      ctx.moveTo(end.x, end.y);
+      ctx.lineTo(end.x - Math.cos(angle - 0.55) * arrow, end.y - Math.sin(angle - 0.55) * arrow);
+      ctx.lineTo(end.x - Math.cos(angle + 0.55) * arrow, end.y - Math.sin(angle + 0.55) * arrow);
+      ctx.closePath();
+      ctx.fill();
+      const mid = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
+      ctx.fillStyle = "rgba(180, 210, 245, 0.55)";
+      ctx.font = "600 9px sans-serif";
+      ctx.fillText(label, mid.x + 8, mid.y - 6);
+      ctx.restore();
+    }
+
+    function drawViewerHud(ctx, width, height) {
+      drawMiniLegend(ctx, 18, 18);
+      const placement = activePlacement?.placement;
+      if (!placement) return;
+      const rect = placement.assigned_rect || {};
+      const score = placement.score?.total ?? placement.placement_score ?? placement.total_score;
+      const feasible = placement.candidate_summary?.feasible_candidates ?? "-";
+      const total = placement.candidate_summary?.total_candidates ?? "-";
+      const block = activePlacement.block || blocks[activePlacement.blockId] || {};
+      const panelW = 285;
+      const panelH = 108;
+      const x = width - panelW - 18;
+      const y = 18;
+      drawPanel(ctx, x, y, panelW, panelH, "rgba(5, 15, 28, 0.82)", "rgba(129, 179, 231, 0.24)");
+      ctx.fillStyle = "#dceaff";
+      ctx.font = "800 12px sans-serif";
+      ctx.fillText("ACTIVE PLACEMENT DECISION", x + 14, y + 22);
+      drawStatusChip(ctx, placement.status || "assigned", x + panelW - 82, y + 10);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "700 13px sans-serif";
+      ctx.fillText(`${activePlacement.blockId || "-"} / ${activePlacement.module || "-"}`, x + 14, y + 46);
+      ctx.fillStyle = "#9fc4ef";
+      ctx.font = "600 10px sans-serif";
+      ctx.fillText(`${formatBlockType(block.type)} | P${block.priority || "-"}`, x + 14, y + 64);
+      ctx.fillText(`Slot x${rect.x ?? "-"}, y${rect.y ?? "-"} | ${rect.w || block.w || "-"}x${rect.h || block.h || "-"}`, x + 14, y + 82);
+      ctx.fillText(`Score ${formatNumber(score)} | Feasible ${feasible}/${total}`, x + 14, y + 100);
+    }
+
+    function drawPanel(ctx, x, y, width, height, fill, stroke) {
+      ctx.save();
+      ctx.fillStyle = fill;
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      if (ctx.roundRect) {
+        ctx.roundRect(x, y, width, height, 8);
+      } else {
+        ctx.rect(x, y, width, height);
+      }
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawMiniLegend(ctx, x, y) {
+      drawPanel(ctx, x, y, 214, 50, "rgba(5, 15, 28, 0.62)", "rgba(129, 179, 231, 0.16)");
+      ctx.fillStyle = "#dceaff";
+      ctx.font = "800 11px sans-serif";
+      ctx.fillText("PLACEMENT VIEW", x + 12, y + 18);
+      drawLegendKey(ctx, x + 12, y + 33, "#f6d36b", "Selected slot");
+      drawLegendKey(ctx, x + 116, y + 33, "#93c5fd", "Grid board");
+    }
+
+    function drawLegendKey(ctx, x, y, color, text) {
+      ctx.fillStyle = color;
+      ctx.fillRect(x, y - 7, 10, 10);
+      ctx.fillStyle = "#9fc4ef";
+      ctx.font = "600 10px sans-serif";
+      ctx.fillText(text, x + 15, y + 2);
+    }
+
+    function drawStatusChip(ctx, text, x, y) {
+      const label = String(text).toUpperCase();
+      ctx.save();
+      ctx.font = "800 9px sans-serif";
+      const w = Math.max(64, ctx.measureText(label).width + 18);
+      drawPanel(ctx, x, y, w, 20, "rgba(32, 92, 72, 0.72)", "rgba(102, 230, 166, 0.22)");
+      ctx.fillStyle = "#9ff5c5";
+      ctx.fillText(label, x + 9, y + 14);
+      ctx.restore();
+    }
+
+    function formatBlockType(type) {
+      return String(type || "block").replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+    }
+
+    function drawTopSlot(ctx, rect, pos, cellW, cellH, planned) {
+      ctx.save();
+      ctx.setLineDash(planned ? [6, 4] : []);
+      ctx.strokeStyle = planned ? "rgba(255,255,255,0.75)" : "#f6d36b";
+      ctx.lineWidth = planned ? 1.5 : 2;
+      ctx.fillStyle = planned ? "rgba(255,255,255,0.06)" : "rgba(246,211,107,0.11)";
+      ctx.fillRect(pos.x + rect.x * cellW, pos.y + rect.y * cellH, (rect.w || 1) * cellW, (rect.h || 1) * cellH);
+      ctx.strokeRect(pos.x + rect.x * cellW, pos.y + rect.y * cellH, (rect.w || 1) * cellW, (rect.h || 1) * cellH);
+      ctx.restore();
+    }
+
+    function projectIso(x, y, z, scale, origin) {
+      return {
+        x: origin.x + (x - z) * scale,
+        y: origin.y + (x + z) * scale * 0.40 - y * scale
+      };
+    }
+
+    function polygon(ctx, points, fill, stroke, width = 1, dash = []) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      points.slice(1).forEach((point) => ctx.lineTo(point.x, point.y));
+      ctx.closePath();
+      ctx.fillStyle = fill;
+      ctx.fill();
+      ctx.setLineDash(dash);
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = width;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function line(ctx, x1, y1, x2, y2) {
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+    }
+
+    function drawCanvasLabel(ctx, text, x, y, options = {}) {
+      ctx.save();
+      ctx.font = options.font || "700 11px sans-serif";
+      const paddingX = options.paddingX || 7;
+      const paddingY = options.paddingY || 4;
+      const metrics = ctx.measureText(text);
+      const width = metrics.width + paddingX * 2;
+      const height = 20;
+      const left = x;
+      const top = y;
+      ctx.fillStyle = options.fill || "rgba(5, 14, 25, 0.82)";
+      ctx.strokeStyle = options.stroke || "rgba(255,255,255,0.18)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      if (ctx.roundRect) {
+        ctx.roundRect(left, top, width, height, 5);
+      } else {
+        ctx.rect(left, top, width, height);
+      }
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = options.text || "#e6f0ff";
+      ctx.fillText(text, left + paddingX, top + height - paddingY - 2);
+      ctx.restore();
+    }
+
+    function shadeColor(hex, percent) {
+      const clean = String(hex || "#8795a5").replace("#", "");
+      const num = parseInt(clean.length === 3 ? clean.split("").map((c) => c + c).join("") : clean, 16);
+      const amt = Math.round(2.55 * percent);
+      const r = Math.max(0, Math.min(255, (num >> 16) + amt));
+      const g = Math.max(0, Math.min(255, ((num >> 8) & 0xff) + amt));
+      const b = Math.max(0, Math.min(255, (num & 0xff) + amt));
+      return `rgb(${r}, ${g}, ${b})`;
+    }
+
+    function renderUtilization() {
+      const usage = getOccupancy();
+      const colors = { Soji: "#a7663d", Painting: "#3aaa72", Storage: "#4a95d8", PE: "#8b6bd6", Average: "#f0b45b" };
+      const rows = MODULE_ORDER.map((name) => {
+        const total = MODULE_META[name].cols * MODULE_META[name].rows;
+        return [name, Math.round((usage[name] / total) * 100), colors[name]];
+      });
+      const avg = Math.round(rows.reduce((sum, row) => sum + row[1], 0) / rows.length);
+      rows.push(["Average", avg, colors.Average]);
+      document.getElementById("utilList").innerHTML = rows.map(([label, value, color]) => `
+        <div class="util-row"><span>${label}</span><span class="bar" style="--bar-color: ${color};"><span style="--value: ${value}%;"></span></span><span>${value}%</span></div>
+      `).join("");
+    }
+
+    function renderSummary(counts) {
+      const rows = [
+        ["Processing", counts.processing, "#85b7ff"],
+        ["Ready for Pickup", counts.ready, "#f6d36b"],
+        ["Moving", counts.moving, "#d8e8ff"],
+        ["Stored", counts.stored, "#4a95d8"],
+        ["Final Complete", counts.final, "#74d99f"]
+      ];
+      document.getElementById("summaryList").innerHTML = rows.map(([label, value, color]) => `
+        <div class="summary-row"><span class="dot" style="--dot: ${color};"></span><span>${label}</span><span class="pill">${value}</span></div>
+      `).join("");
+    }
+
+    function renderAnalyzer() {
+      const list = document.getElementById("analyzerList");
+      const moduleCapaRows = (activeLog?.modules || [])
+        .map((module) => {
+          const name = normalizeModule(module.module_name || module.module_id);
+          if (!MODULE_META[name] || module.required_area == null) return null;
+          return {
+            process_name: name,
+            current_capa: module.current_area ?? (Number(module.grid_cols || 0) * Number(module.grid_rows || 0)),
+            peak_area: module.peak_area,
+            required_capa: module.required_area,
+            adjustment: module.area_adjustment,
+            recommendation: module.recommendation,
+            capa_unit: module.capa_unit || "grid_cells"
+          };
+        })
+        .filter(Boolean);
+      const resultRows = analyzerResult?.required_capa_by_process || moduleCapaRows;
+      if (!resultRows.length) {
+        list.innerHTML = `
+          <div class="analyzer-row"><span>Analyzer</span><span class="pill">Waiting</span></div>
+          <div class="analyzer-row"><span>Result</span><span class="pill blue">Upload / playback</span></div>
+        `;
+        return;
+      }
+      const rows = resultRows.map((item) => {
+        const current = Number(item.current_capa ?? 0);
+        const peak = Number(item.peak_area ?? 0);
+        const required = Number(item.required_capa ?? 0);
+        const adjustment = Number(item.adjustment ?? (required - current));
+        let label = "OK";
+        let klass = "ok";
+        if (adjustment > 0) {
+          label = `SHORT ${adjustment}`;
+          klass = "danger";
+        } else if (adjustment < 0) {
+          label = `SURPLUS ${Math.abs(adjustment)}`;
+          klass = "blue";
+        }
+        return `
+          <div class="analyzer-row capa-row">
+            <strong>${item.process_name}</strong>
+            <span>${current}</span>
+            <span>${required}</span>
+            <span class="pill ${klass}">${label}</span>
+          </div>
+          ${peak ? `<div class="analyzer-row"><span>${item.process_name} peak</span><span class="pill neutral">${peak} cells</span></div>` : ""}
+        `;
+      }).join("");
+      const mix = activeLog?.meta?.block_mix
+        ? Object.entries(activeLog.meta.block_mix).map(([type, count]) => `${type.replaceAll("_", " ")} ${count}`).join(" / ")
+        : "";
+      const overall = analyzerResult?.overall_metrics || activeLog?.meta?.analyzer_metrics?.overall_metrics;
+      const zoneMetrics = analyzerResult?.zone_metrics || activeLog?.meta?.analyzer_metrics?.zone_metrics;
+      const metricNote = overall
+        ? `Placement success ${Math.round((overall.placement_success_rate || 0) * 100)}% / final ${overall.final_complete_count ?? 0}/${overall.total_blocks_processed ?? 0}`
+        : "";
+      const scheduleNote = overall
+        ? `Avg deviation ${formatDeviation(overall.average_arrival_deviation)} / max delay ${formatNumber(overall.max_arrival_delay)} / delayed ${overall.delayed_block_count ?? 0} / replanned ${overall.replanning_count ?? 0}`
+        : "";
+      const fragNote = zoneMetrics
+        ? MODULE_ORDER.map((name) => {
+            const metric = zoneMetrics[name];
+            return metric ? `${name} score ${metric.average_placement_score} frag ${Math.round((metric.average_fragmentation_index || 0) * 100)}%` : "";
+          }).filter(Boolean).join(" / ")
+        : "";
+      list.innerHTML = `
+        <div class="analyzer-head"><span>Zone</span><span>CAP</span><span>Due Need</span><span>Forecast</span></div>
+        ${rows}
+        <div class="analyzer-note">${analyzerResult ? "Analyzer event result" : "DEVS JSON plan"}: top zone % is current visible occupancy. Due Need is deadline capacity forecast in grid cells.</div>
+        ${metricNote ? `<div class="analyzer-note">${metricNote}</div>` : ""}
+        ${scheduleNote ? `<div class="analyzer-note">${scheduleNote}</div>` : ""}
+        ${fragNote ? `<div class="analyzer-note">${fragNote}</div>` : ""}
+        ${mix ? `<div class="analyzer-note">Block mix: ${mix}</div>` : ""}
+      `;
+    }
+
+    function playbackLoop(now) {
+      if (!playing) {
+        playbackFrameId = null;
+        return;
+      }
+      const delta = lastFrame ? (now - lastFrame) / 1000 : 0;
+      lastFrame = now;
+      simTime += delta * playbackSpeed;
+      let changed = false;
+      while (currentEventIndex < events.length && events[currentEventIndex].time <= simTime) {
+        applyEvent(events[currentEventIndex]);
+        currentEventIndex += 1;
+        changed = true;
+      }
+      if (currentEventIndex >= events.length) playing = false;
+      updateClock();
+      if (changed) {
+        updateDashboard();
+      }
+      render3DViewer();
+      playbackFrameId = playing ? requestAnimationFrame(playbackLoop) : null;
+    }
+
+    function getOccupancy() {
+      const usage = Object.fromEntries(MODULE_ORDER.map((name) => [name, 0]));
+      Object.values(blocks).forEach((block) => {
+        if (block.moving || block.status === "moving") return;
+        if (!usage[block.module] && usage[block.module] !== 0) return;
+        usage[block.module] += block.w * block.h;
+      });
+      return usage;
+    }
+
+    function getOccupancyCells(ignoreId = null) {
+      const cells = Object.fromEntries(MODULE_ORDER.map((name) => [name, new Set()]));
+      Object.values(blocks).forEach((block) => {
+        if (block.id === ignoreId) return;
+        if (block.moving || block.status === "moving") return;
+        if (!cells[block.module]) return;
+        for (let y = block.y; y < block.y + block.h; y += 1) {
+          for (let x = block.x; x < block.x + block.w; x += 1) cells[block.module].add(`${x},${y}`);
+        }
+      });
+      return cells;
+    }
+
+    function isAreaOpen(moduleName, x, y, w, h, ignoreId = null) {
+      const meta = MODULE_META[moduleName] || MODULE_META.Soji;
+      if (x < 0 || y < 0 || x + w > meta.cols || y + h > meta.rows) return false;
+      const cells = getOccupancyCells(ignoreId)[moduleName] || new Set();
+      for (let yy = y; yy < y + h; yy += 1) {
+        for (let xx = x; xx < x + w; xx += 1) {
+          if (cells.has(`${xx},${yy}`)) return false;
+        }
+      }
+      return true;
+    }
+
+    function findFirstOpen(moduleName, w, h, ignoreId = null) {
+      const meta = MODULE_META[moduleName] || MODULE_META.Soji;
+      const cells = getOccupancyCells(ignoreId)[moduleName] || new Set();
+      for (let y = 0; y <= meta.rows - h; y += 1) {
+        for (let x = 0; x <= meta.cols - w; x += 1) {
+          let ok = true;
+          for (let yy = y; yy < y + h; yy += 1) {
+            for (let xx = x; xx < x + w; xx += 1) {
+              if (cells.has(`${xx},${yy}`)) ok = false;
+            }
+          }
+          if (ok) return { x, y };
+        }
+      }
+      return null;
+    }
+
+    function ensureTransporter(id, seed = {}) {
+      if (!id) id = `T-${String(Object.keys(transporters).length + 1).padStart(2, "0")}`;
+      if (!transporters[id]) {
+        transporters[id] = {
+          id,
+          status: seed.status || "idle",
+          current_location: seed.current_location || "Parking",
+          loadedBlockId: null,
+          plan: "Standby",
+          activeMove: null
+        };
+      }
+      return transporters[id];
+    }
+
+    function normalizeModule(value) {
+      if (!value) return "Soji";
+      const text = String(value).toLowerCase();
+      if (text.includes("paint")) return "Painting";
+      if (text.includes("stg") || text.includes("stor")) return "Storage";
+      if (text.includes("pe")) return "PE";
+      if (text.includes("soji") || text.includes("surface")) return "Soji";
+      return value;
+    }
+
+    function normalizeStatus(status, moduleName) {
+      const text = String(status || "").toLowerCase();
+      if (moduleName === "Storage" || text.includes("stored")) return "stored";
+      if (text.includes("ready") || text.includes("done")) return "ready";
+      if (text.includes("final")) return "final";
+      if (text.includes("moving")) return "moving";
+      return "processing";
+    }
+
+    function getPlacementResult(payload) {
+      return payload?.placement_result || payload?.placement || null;
+    }
+
+    function getScheduleContext(payload, placementResult = null) {
+      return payload?.schedule_context || placementResult?.schedule_context || {
+        planned_arrival_time: payload?.planned_arrival_time ?? placementResult?.planned_arrival_time ?? null,
+        actual_arrival_time: payload?.actual_arrival_time ?? placementResult?.actual_arrival_time ?? null,
+        arrival_deviation: placementResult?.arrival_deviation ?? null,
+        is_delayed: Boolean(placementResult?.is_delayed),
+        is_early: Boolean(placementResult?.is_early),
+        planned_cell: payload?.planned_cell || null
+      };
+    }
+
+    function formatRect(rect) {
+      if (!rect) return "-";
+      return `x${rect.x}, y${rect.y}, ${rect.w || rect.cols || 1}x${rect.h || rect.rows || 1}`;
+    }
+
+    function formatNumber(value) {
+      return value == null ? "-" : Number(value).toFixed(1);
+    }
+
+    function formatDeviation(value) {
+      if (value == null) return "-";
+      const rounded = Number(value).toFixed(1);
+      if (value > 0) return `+${rounded} delayed`;
+      if (value < 0) return `${rounded} early`;
+      return "0.0 on-time";
+    }
+
+    function getColorForStatus(status, moduleName) {
+      if (status === "ready") return "#8fb6c4";
+      if (status === "stored") return "#5f7f9f";
+      if (status === "final") return "#6aa982";
+      if (moduleName === "Soji") return "#a7663d";
+      if (moduleName === "Painting") return "#aa5750";
+      if (moduleName === "PE") return "#7f8995";
+      return statusColors[status] || "#8795a5";
+    }
+
+    function getShapeForBlock(id, type = "") {
+      const shapes = ["shape-a", "shape-b", "shape-c", "shape-d", "shape-l"];
+      if (type.includes("side")) return "shape-l";
+      if (type.includes("long")) return "shape-d";
+      const n = Number(String(id).replace(/\D/g, "")) || 0;
+      return shapes[n % shapes.length];
+    }
+
+    function getBlockTypeColor(type = "", status = "") {
+      if (status === "final") return "#6aa982";
+      if (status === "stored") return "#5f7f9f";
+      if (type.includes("curved")) return "#8fb6c4";
+      if (type.includes("deck")) return "#b8b16e";
+      if (type.includes("engine")) return "#a07083";
+      if (type.includes("l_shape") || type.includes("side")) return "#b97b55";
+      if (type.includes("bulkhead")) return "#9b9fa8";
+      return "#8795a5";
+    }
+
+    function get3DHeight(block) {
+      const priorityLift = { P1: 16, P2: 9, P3: 5 }[block.priority] ?? 8;
+      const processValue = typeof block.processTime === "number"
+        ? block.processTime
+        : Number(block.processTime?.[block.module] || 0);
+      return Math.min(34, 10 + priorityLift + processValue * 0.5);
+    }
+
+    function updateClock() {
+      const unit = activeLog?.meta?.time_unit || "min";
+      document.getElementById("simTime").textContent = `${simTime.toFixed(1)} ${unit}`;
+    }
+
+    function lerp(a, b, t) { return a + (b - a) * t; }
+    function ease(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+
+    document.getElementById("startBtn").addEventListener("click", startPlayback);
+    document.getElementById("pauseBtn").addEventListener("click", pausePlayback);
+    document.getElementById("resetBtn").addEventListener("click", () => resetSimulation());
+    document.getElementById("loadJsonBtn").addEventListener("click", () => jsonInput.click());
+    speedSelect.addEventListener("change", () => { playbackSpeed = Number(speedSelect.value) || 1; });
+    candidateToggle.addEventListener("change", () => {
+      showCandidateOverlay = candidateToggle.checked;
+      render3DViewer();
+    });
+    caseSelect.addEventListener("change", () => {
+      if (caseSelect.value === "case1") loadEventLog(SAMPLE_CASE_1);
+      if (caseSelect.value === "case2") loadEventLog(SAMPLE_CASE_2);
+      if (caseSelect.value === "loaded" && loadedLog) loadEventLog(loadedLog);
+    });
+    jsonInput.addEventListener("change", async (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const text = await file.text();
+      loadedLog = JSON.parse(text);
+      caseSelect.querySelector('option[value="loaded"]').disabled = false;
+      caseSelect.value = "loaded";
+      loadEventLog(loadedLog);
+    });
+    window.addEventListener("resize", () => {
+      render3DViewer();
+    });
+    window.addEventListener("load", () => {
+      render3DViewer();
+    });
+
+    loadEventLog(SAMPLE_CASE_1);
+  </script>
+</body>
+</html>
+
+
+
+
